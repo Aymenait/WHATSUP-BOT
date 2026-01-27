@@ -4,6 +4,7 @@ import pino from 'pino';
 import QRCode from 'qrcode';
 import fs from 'fs';
 import { exec } from 'child_process';
+import qrcodeTerminal from 'qrcode-terminal';
 import { generateResponse, checkPurchaseIntent, checkSupportIntent } from './ai-handler.js';
 import { fetchCurrentProducts, formatProductsForAI } from './products-fetcher.js';
 import { notifyNewLead, sendNotification } from './telegram-notify.js';
@@ -25,6 +26,8 @@ async function startBot() {
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
+            console.log('📡 QR Received via Stream');
+            qrcodeTerminal.generate(qr, { small: true });
             try {
                 const qrImage = await QRCode.toDataURL(qr);
                 const html = `<html><body style="text-align:center;padding:50px;"><h2>Scan QR</h2><img src="${qrImage}"></body></html>`;
