@@ -1,0 +1,30 @@
+import express from 'express';
+import cors from 'cors';
+import dotenv from 'dotenv';
+import { getAllProducts } from '../products-api.js';
+import './whatsapp-handler.js'; // Just import to start the bot
+
+dotenv.config();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+app.get('/', (req, res) => res.json({ status: 'ok', message: 'Market Algeria AI Bot' }));
+
+app.get('/api/products', (req, res) => {
+    try {
+        const data = getAllProducts();
+        res.json({ success: true, data });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+console.log('🚀 Starting Market Algeria AI Bot...');
+
+app.listen(PORT, () => {
+    console.log(`📡 API Server running on port ${PORT}`);
+});
