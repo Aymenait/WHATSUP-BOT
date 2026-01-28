@@ -32,10 +32,10 @@ function formatProductsForAI(data) {
                     durationName += ' (مدة سنة كاملة - 1 Year)';
                 }
 
-                productsText += `   - ${durationName}: السعر ${d.price_dzd} DA\n`;
+                productsText += `   - ${durationName}: السعر ${d.price_dzd} DA / $${d.price_usd} USD\n`;
             });
         } else {
-            productsText += `💰 السعر: ${p.price_dzd} DA\n`;
+            productsText += `💰 السعر: ${p.price_dzd} DA / $${p.price_usd || 'N/A'} USD\n`;
         }
         productsText += `-------------------\n`;
     });
