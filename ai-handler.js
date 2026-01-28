@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 import fetch from 'node-fetch';
+import { OpenRouter } from "@openrouter/sdk";
 dotenv.config();
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -18,9 +19,61 @@ const BUSINESS_INFO = {
 };
 
 /**
- * Generate AI response using PAID OpenRouter model (Gemini 3)
+ * Generate AI response using NEW OpenRouter SDK (Gemini 2.5 Flash Lite)
  */
 async function generateResponse(userMessage, productsContext, history = []) {
+    try {
+        console.log('⚡ Calling NEW Gemini 2.5 Flash Lite (SDK)...');
+
+        const client = new OpenRouter({
+            apiKey: process.env.OPENROUTER_API_KEY || process.env.NEW_OPENROUTER_KEY
+        });
+
+        const messages = [
+            {
+                "role": "system",
+                "content": `You are a professional sales assistant for "${BUSINESS_INFO.name}".
+AVAILABLE PRODUCTS:
+${productsContext}
+RULES:
+- Only sell listed products.
+- No emojis.
+- Respond in the user's language.
+- STRICT LANGUAGE RULE: 
+  - If the user speaks Arabic or Algerian Darija, you MUST use ARABIC SCRIPT (الحروف العربية) ONLY. 
+  - DO NOT use Latin characters for Arabic (No "Salam", "Labas"). Use "سلام", "لاباس".
+  - If the user speaks French/English, use Latin script.
+- Be helpful and professional.
+- IF selecting BaridiMob, use RIP: ${BUSINESS_INFO.baridimob_rip}, Name: ${BUSINESS_INFO.baridimob_name}.`
+            },
+            ...history.slice(-6).map(h => ({
+                "role": h.role === 'user' ? 'user' : 'assistant',
+                "content": h.text
+            })),
+            { "role": "user", "content": userMessage }
+        ];
+
+        const result = await client.chat.send({
+            model: "google/gemini-2.5-flash",
+            messages: messages
+        });
+
+        if (result.choices && result.choices[0]?.message?.content) {
+            return result.choices[0].message.content;
+        } else {
+            console.error("❌ SDK Response Error:", JSON.stringify(result));
+            return "مرحباً! كيفاش نساعدك اليوم؟";
+        }
+
+    } catch (error) {
+        console.error("❌ SDK Exception:", error);
+        return "سلام! كاين شوية ضغط، راح يجاوبك الأدمين في أقرب وقت.";
+    }
+}
+
+/*
+// OLD IMPLEMENTATION (BACKUP)
+async function generateResponseOld(userMessage, productsContext, history = []) {
     try {
         console.log('⚡ Calling PAID Gemini 3 Flash (Premium Payment Info)...');
 
@@ -97,6 +150,7 @@ RULES:
         return "سلام! كاين شوية ضغط، راح يجاوبك الأدمين في أقرب وقت.";
     }
 }
+*/
 
 /**
  * Check if payment info was sent (Notify Admin + Pause AI)

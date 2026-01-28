@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { getAllProducts } from '../products-api.js';
+import { PRODUCTS_DATA } from './products-data.js';
 import './whatsapp-handler.js'; // Just import to start the bot
 
 dotenv.config();
@@ -16,7 +16,7 @@ app.get('/', (req, res) => res.json({ status: 'ok', message: 'Market Algeria AI 
 
 app.get('/api/products', (req, res) => {
     try {
-        const data = getAllProducts();
+        const data = PRODUCTS_DATA;
         res.json({ success: true, data });
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });

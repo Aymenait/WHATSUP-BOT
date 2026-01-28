@@ -25,16 +25,15 @@ async function startBot() {
 
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
-        if (qr) {
+
+        // 🔹 عرض Pairing Code للسيرفرات (إذا كانت مفعلة)
+        if (qr && process.env.USE_PAIRING_CODE === 'true') {
+            console.log("⚠️ QR Code ignored because USE_PAIRING_CODE is true.");
+        } else if (qr) {
             console.log('📡 QR Received via Stream');
             qrcodeTerminal.generate(qr, { small: true });
-            try {
-                const qrImage = await QRCode.toDataURL(qr);
-                const html = `<html><body style="text-align:center;padding:50px;"><h2>Scan QR</h2><img src="${qrImage}"></body></html>`;
-                fs.writeFileSync('scan-qr.html', html);
-                console.log('📡 NEW QR CODE GENERATED! Open scan-qr.html to scan.');
-            } catch (err) { }
         }
+
         if (connection === 'close') {
             const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
             console.log('🔌 Connection closed. Reconnecting:', shouldReconnect);
@@ -43,6 +42,22 @@ async function startBot() {
             console.log('✅ BOT IS ONLINE AND READY!');
         }
     });
+
+    // 🔹 طلب الـ Pairing Code بعد 5 ثواني من بدء الاتصال (لأنه يحتاج Socket جاهز)
+    if (!state.creds.registered && process.env.USE_PAIRING_CODE === 'true') {
+        setTimeout(async () => {
+            const phoneNumber = process.env.PAIRING_NUMBER;
+            if (phoneNumber) {
+                console.log(`📱 Requesting Pairing Code for: ${phoneNumber}`);
+                const code = await sock.requestPairingCode(phoneNumber);
+                console.log(`\n==================================================`);
+                console.log(`🔢 YOUR PAIRING CODE:  ${code}`);
+                console.log(`==================================================\n`);
+            } else {
+                console.error("❌ ERROR: PAIRING_NUMBER is missing in .env file");
+            }
+        }, 5000);
+    }
 
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
@@ -117,9 +132,14 @@ async function startBot() {
             chatHistory.set(chatId, history);
 
             if (await checkPurchaseIntent(text, aiResponse)) {
-                pausedChats.add(chatId);
-                console.log(`💰 Payment info sent. AI Paused.`);
+                // pausedChats.add(chatId); // ❌ نحينا التوقف (Bot stays active)
+                console.log(`💰 Payment info sent. Notifying Admin...`);
+
+                // 1. نبعثو تنبيه ليك في التيليغرام
                 notifyNewLead({ number: chatId, pushname: pushName }, "طلب مبيعات (دفع)", text).catch(() => { });
+
+                // 2. نبعثو رسالة طمأنة للزبون (بلا ما نحبسو البوت)
+                await sock.sendMessage(chatId, { text: "✅ تم تسجيل طلبك وتبليغ المشرف. سيقوم بالتواصل معك وتفعيل اشتراكك فور تواجده.\nيرجى إرسال صورة الوصل هنا للاسراع في العملية.\n\nAdmin has been notified. Please send the payment receipt here." });
             }
 
         } catch (error) {

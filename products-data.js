@@ -123,6 +123,15 @@ export const PRODUCTS_DATA = {
             durations: [
                 { key: "1year", price_dzd: 2500 }
             ]
+        },
+        {
+            name: "SciSpace Premium",
+            price_dzd: 1800,
+            description: "مساعد بحث علمي مدعوم بالذكاء الاصطناعي لتسهيل القراءة والكتابة والنشر.",
+            durations: [
+                { key: "1month", price_dzd: 1800 },
+                { key: "3months", price_dzd: 3000 }
+            ]
         }
     ],
     payment_methods: [
