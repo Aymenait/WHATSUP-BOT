@@ -42,7 +42,11 @@ const PRODUCTS_DATA = {
 async function generateResponse(userMessage, productsContext, history = [], imageBase64 = null) {
     try {
         const client = new OpenRouter({
-            apiKey: process.env.OPENROUTER_API_KEY || process.env.NEW_OPENROUTER_KEY
+            apiKey: OPENROUTER_API_KEY,
+            header: {
+                "HTTP-Referer": "https://marketalgeria.store",
+                "X-Title": "Market Algeria Pro"
+            }
         });
 
         const content = [];
@@ -103,12 +107,29 @@ ${productsContext}
 
         messages.push({ "role": "user", "content": content });
 
-        const result = await client.chat.send({
-            model: "google/gemini-2.5-flash",
-            messages: messages
+        const stream = await client.chat.send({
+            model: "google/gemini-3-flash-preview",
+            messages: messages.map(m => ({
+                role: m.role,
+                content: m.content
+            })),
+            stream: true,
+            streamOptions: {
+                includeUsage: true
+            }
         });
 
-        let aiText = result.choices[0]?.message?.content || "";
+        let aiText = "";
+        for await (const chunk of stream) {
+            const content = chunk.choices[0]?.delta?.content;
+            if (content) {
+                aiText += content;
+            }
+
+            if (chunk.usage) {
+                console.log("📊 Reasoning tokens:", chunk.usage.reasoningTokens);
+            }
+        }
 
         // حماية: إذا خرجت الكلمة البرمجية بشكل خاطئ أو في رسالة نصية
         if (aiText.includes('RECEIPT_DETECTED')) {
