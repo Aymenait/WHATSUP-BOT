@@ -17,6 +17,8 @@ function formatProductsForAI(data) {
 
     data.products.forEach(p => {
         productsText += `📦 المنتج: ${p.name}\n`;
+        productsText += `📁 الفئة: ${p.category || 'عام'}\n`;
+        productsText += `🔖 كلمات مفتاحية: ${p.keywords ? p.keywords.join(', ') : ''}\n`;
         productsText += `📝 الوصف: ${p.description}\n`;
 
         if (p.durations && p.durations.length > 0) {

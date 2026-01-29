@@ -7,11 +7,30 @@ import { exec } from 'child_process';
 import qrcodeTerminal from 'qrcode-terminal';
 import { generateResponse, checkPurchaseIntent, checkSupportIntent } from './ai-handler.js';
 import { fetchCurrentProducts, formatProductsForAI } from './products-fetcher.js';
-import { notifyNewLead, sendNotification } from './telegram-notify.js';
+import { notifyNewLead, sendNotification, sendNotificationWithButton, startTelegramPolling } from './telegram-notify.js';
 
 const chatHistory = new Map();
 const pausedChats = new Set();
 const botMessageIds = new Set();
+const autoResumeTimers = new Map();
+
+const AUTO_RESUME_DELAY = 30 * 60 * 1000; // 30 minutes
+
+/**
+ * دالة لإعادة تفعيل البوت لشات معين
+ */
+function resumeChat(chatId) {
+    if (pausedChats.has(chatId)) {
+        pausedChats.delete(chatId);
+        console.log(`✅ AI Resumed for ${chatId}`);
+
+        // مسح التايمر إذا وجد
+        if (autoResumeTimers.has(chatId)) {
+            clearTimeout(autoResumeTimers.get(chatId));
+            autoResumeTimers.delete(chatId);
+        }
+    }
+}
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
@@ -59,6 +78,11 @@ async function startBot() {
         }, 5000);
     }
 
+    // بدء مراقبة تلغرام للتفاعلات (الأزرار)
+    startTelegramPolling((chatId) => {
+        resumeChat(chatId);
+    });
+
     sock.ev.on('messages.upsert', async (m) => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.remoteJid === 'status@broadcast') return;
@@ -78,68 +102,129 @@ async function startBot() {
                 return;
             }
 
-            if (messageText === '!ok' || messageText === '!bot' || messageText === '!resume') {
-                pausedChats.delete(chatId);
-                console.log(`🟢 AI ACTIVATED manually for ${chatId}`);
-                const sent = await sock.sendMessage(chatId, { text: "تم تفعيل الرد الآلي بنجاح." });
-                botMessageIds.add(sent.key.id);
+            // Silent resume via command
+            if (messageText === '!ok' || messageText === '!bot') {
+                resumeChat(chatId);
                 return;
             }
 
-            if (text.length > 0 && !pausedChats.has(chatId)) {
+            if (text.length > 0) {
                 console.log(`⚠️ Manual Admin message: Pausing AI for ${chatId}`);
                 pausedChats.add(chatId);
+
+                // إعادة ضبط التايمر التلقائي (Auto-Resume) لإعادة التفعيل بعد ساعتين
+                if (autoResumeTimers.has(chatId)) {
+                    clearTimeout(autoResumeTimers.get(chatId));
+                }
+
+                const timer = setTimeout(() => {
+                    if (pausedChats.has(chatId)) {
+                        resumeChat(chatId);
+                        sendNotification(`⏰ <b>تفعيل تلقائي:</b> مرّت 30 دقيقة بدون تدخل، عاد البوت للعمل مع ${pushName}.`);
+                    }
+                }, AUTO_RESUME_DELAY);
+
+                autoResumeTimers.set(chatId, timer);
+
+                // إرسال إشعار تلغرام مع زر التفعيل
+                await sendNotificationWithButton(`⚠️ <b>توقف الرد الآلي</b>
+👤 الزبون: ${pushName}
+💬 رسالتك: ${text}
+📱 الرابط: https://wa.me/${chatId.split('@')[0]}
+⏰ <i>سيتم التفعيل تلقائياً بعد 30 دقيقة.</i>`, chatId);
             }
             return;
         }
 
+        // Detect Message Types
+        const isAudio = msg.message.audioMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage;
+        const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+
         if (pausedChats.has(chatId)) return;
+
+        // 🎙️ Handle Voice Notes
+        if (isAudio) {
+            console.log(`🎙️ Voice note received from ${pushName}`);
+            const voiceReply = "عذراً، أنا مساعد ذكي أستطيع فهم الرسائل النصية فقط. من فضلك اكتب استفسارك نصياً لأتمكن من مساعدتك فوراً، أو انتظر قليلاً لحين دخول المشرف لسماع رسالتك الصوتية.";
+            const sent = await sock.sendMessage(chatId, { text: voiceReply });
+            botMessageIds.add(sent.key.id);
+            return;
+        }
+
+        // 🖼️ Handle Images (Receipts)
+        if (isImage && !text) {
+            console.log(`🖼️ Image received from ${pushName}`);
+            const imageReply = "شكراً لك! لقد استلمت الصورة. تم إبلاغ المشرف للتحقق من الوصل وتفعيل اشتراكك في أقرب وقت (عادةً بين 5 إلى 30 دقيقة). إذا كان لديك سؤال آخر يمكنك طرحه هنا.";
+            const sent = await sock.sendMessage(chatId, { text: imageReply });
+            botMessageIds.add(sent.key.id);
+
+            // Notify Admin via Telegram with button
+            await sendNotificationWithButton(`🖼️ *وصل دفع (صورة)*\n👤 الإسم: ${pushName}\n📱 رابط المحادثة: https://wa.me/${chatId.split('@')[0]}`, chatId);
+            return;
+        }
+
         if (!text || text.trim().length === 0) return;
 
         console.log(`📩 New message from ${pushName}: ${text}`);
 
         try {
-            // 🚨 إذا طلب الزبون المشرف: البوت يؤكد له ذلك ثم يتوقف
+            // 🚨 إذا طلب الزبون المشرف: نبلغه ونبقي البوت يعمل
             if (await checkSupportIntent(text)) {
-                console.log(`🆘 Support requested by ${pushName}. Confirmed to user and notifying Admin.`);
+                console.log(`🆘 Support requested by ${pushName}. Notifying Admin but keeping AI active.`);
 
-                // 1. نرد على الزبون في واتساب
-                const confirmationMsg = "نعم، سأقوم بتبليغ المشرف (Admin) فوراً. يرجى الانتظار قليلاً وسيكون معك. شكراً على صبرك.\n\nYes, I will notify the Admin immediately. Please wait a moment, they will be with you shortly. Thank you for your patience.";
+                const confirmationMsg = "نعم، سأقوم بتبليغ المشرف (Admin) فوراً. سيبقى الرد الآلي مفعلاً لمساعدتك في أي استفسار آخر حتى يتواجد المشرف معك. شكراً لصبرك.";
                 const sent = await sock.sendMessage(chatId, { text: confirmationMsg });
                 botMessageIds.add(sent.key.id);
 
-                // 2. نحبس البوت
-                pausedChats.add(chatId);
-
-                // 3. نرسل التنبيه في تلغرام
-                await sendNotification(`🆘 *طلب مساعدة مباشرة*\n👤 الإسم: ${pushName}\n💬 الرسالة: ${text}\n📱 رابط المحادثة: https://wa.me/${chatId.split('@')[0]}`);
-                return;
+                // نرسل التنبيه في تلغرام مع زر
+                await sendNotificationWithButton(`🆘 *طلب مساعدة مباشرة*\n👤 الإسم: ${pushName}\n💬 الرسالة: ${text}\n📱 رابط المحادثة: https://wa.me/${chatId.split('@')[0]}`, chatId);
+                // ملاحظة: لم نضف chatId إلى pausedChats ليبقى البوت شغالاً
             }
 
             const data = await fetchCurrentProducts();
             const context = data ? formatProductsForAI(data) : "منتجاتنا متوفرة.";
 
             const history = chatHistory.get(chatId) || [];
-            let aiResponse = await generateResponse(text, context, history);
+            let imageBase64 = null;
 
-            console.log(`🤖 Bot is replying to ${pushName}...`);
-            const sentResponse = await sock.sendMessage(chatId, { text: aiResponse });
+            // إذا كانت الرسالة صورة
+            if (msg.message?.imageMessage) {
+                console.log('🖼️ User sent an image, analyzing...');
+                const buffer = await downloadMediaMessage(msg, 'buffer');
+                imageBase64 = buffer.toString('base64');
+            }
+
+            // تنفيذ الرد مع تمرير الصورة إن وجدت
+            let aiResponse = await generateResponse(text, context, history, imageBase64);
+
+            // تنظيف الرد من الكلمات البرمجية قبل إرساله للزبون
+            const cleanResponse = aiResponse.replace(/REGISTER_ORDER/g, '').trim();
+            console.log(`🤖 AI Reply: ${cleanResponse}`);
+
+            // إرسال الرد النصي
+            const sentResponse = await sock.sendMessage(chatId, { text: cleanResponse });
             botMessageIds.add(sentResponse.key.id);
 
+            // ميزة إرسال صورة الـ CCP: ترسل فقط إذا طلب الزبون الـ CCP صراحة
+            const ccpKeywords = ['سي سي بي', 'ccp', 'الحساب البريدي', 'رقم الحساب'];
+            const userAskedForCCP = ccpKeywords.some(key => text.toLowerCase().includes(key));
+
+            if (userAskedForCCP && aiResponse.includes('27875484')) {
+                console.log('Sending CCP image to user (Requested)...');
+                await sock.sendMessage(chatId, {
+                    image: { url: 'https://i.imgur.com/EzhHkFQ.jpeg' },
+                    caption: '📸 صورة بطاقة الـ CCP لتسهيل عملية الدفع.'
+                });
+            }
+
             history.push({ role: 'user', text: text });
-            history.push({ role: 'assistant', text: aiResponse });
-            if (history.length > 6) history.shift();
+            history.push({ role: 'assistant', text: cleanResponse });
+            if (history.length > 12) history.shift(); // Increased memory to 12
             chatHistory.set(chatId, history);
 
-            if (await checkPurchaseIntent(text, aiResponse)) {
-                // pausedChats.add(chatId); // ❌ نحينا التوقف (Bot stays active)
-                console.log(`💰 Payment info sent. Notifying Admin...`);
-
-                // 1. نبعثو تنبيه ليك في التيليغرام
-                notifyNewLead({ number: chatId, pushname: pushName }, "طلب مبيعات (دفع)", text).catch(() => { });
-
-                // 2. نبعثو رسالة طمأنة للزبون (بلا ما نحبسو البوت)
-                await sock.sendMessage(chatId, { text: "✅ تم تسجيل طلبك وتبليغ المشرف. سيقوم بالتواصل معك وتفعيل اشتراكك فور تواجده.\nيرجى إرسال صورة الوصل هنا للاسراع في العملية.\n\nAdmin has been notified. Please send the payment receipt here." });
+            if (aiResponse.includes('REGISTER_ORDER')) {
+                console.log(`💰 Order Confirmation Detected. Notifying Admin...`);
+                notifyNewLead({ number: chatId, pushname: pushName }, "طلب مبيعات (مؤكد)", text).catch(() => { });
             }
 
         } catch (error) {

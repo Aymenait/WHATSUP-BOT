@@ -13,61 +13,117 @@ const BUSINESS_INFO = {
     baridimob_rip: process.env.BARIDIMOB_RIP || "00799999002787548473",
     baridimob_name: process.env.BARIDIMOB_NAME || "AIT AMARA AYMENE",
     usdt_trc20: process.env.USDT_TRC20 || "TWTgY41LNFqZcgBiRCZYsSq6ooeCx8gus9",
-    usdt_bep20: process.env.USDT_BEP20 || "ADDRESS_HERE",
-    binance_id: process.env.BINANCE_PAY_ID || "ID_HERE",
+    usdt_bep20: process.env.USDT_BEP20 || "0xa07c3892bd946f61ec736f52dd8ecacb8c2edec0",
+    binance_id: process.env.BINANCE_PAY_ID || "527899700",
     redotpay: process.env.REDOTPAY_ID || "1117632168"
 };
 
-/**
- * Generate AI response using NEW OpenRouter SDK (Gemini 2.5 Flash Lite)
- */
-async function generateResponse(userMessage, productsContext, history = []) {
-    try {
-        console.log('⚡ Calling NEW Gemini 2.5 Flash Lite (SDK)...');
+// Placeholder for PRODUCTS_DATA, assuming it's defined elsewhere or will be added.
+// For the purpose of this change, we assume PRODUCTS_DATA is available in scope.
+const PRODUCTS_DATA = {
+    // Example structure, replace with actual data if available
+    "product1": {
+        name: "Product One",
+        price_dzd: 1000,
+        price_usd: 10,
+        description: { ar: "وصف المنتج الأول" }
+    },
+    "product2": {
+        name: "Product Two",
+        price_dzd: 2000,
+        price_usd: 20,
+        description: { ar: "وصف المنتج الثاني" }
+    }
+};
 
+/**
+ * Generate AI response (Simplified & Direct)
+ */
+async function generateResponse(userMessage, productsContext, history = [], imageBase64 = null) {
+    try {
         const client = new OpenRouter({
             apiKey: process.env.OPENROUTER_API_KEY || process.env.NEW_OPENROUTER_KEY
+        });
+
+        const content = [];
+
+        // التحقق من الصور بدقة عالية جداً
+        if (imageBase64) {
+            content.push({
+                "type": "image_url",
+                "image_url": { "url": `data:image/jpeg;base64,${imageBase64}` }
+            });
+            content.push({
+                "type": "text",
+                "text": "حلل الصورة بدقة: إذا كانت وصل دفع رسمي (Baridimob, CCP, Receipt) يحتوي على أرقام حسابات أو ختم بنكي، رد بـ 'RECEIPT_DETECTED'. أما إذا كانت صورة إنسان، وجه، طبيعة، أو أي شيء غير مالي، رد بوصف طبيعي للصورة وتجاهل تماماً موضوع الدفع."
+            });
+        }
+
+        content.push({
+            "type": "text",
+            "text": userMessage || "ماذا توضح هذه الصورة؟"
         });
 
         const messages = [
             {
                 "role": "system",
-                "content": `You are a professional sales assistant for "${BUSINESS_INFO.name}".
-AVAILABLE PRODUCTS:
+                "content": `أنت مساعد مبيعات إنسان في متجر "${BUSINESS_INFO.name}".
+
+قواعد صارمة (STRICT RULES):
+1. الرد حصراً بنفس لغة الزبون (إذا بدأ بالإنجليزية، أكمل بالإنجليزية فقط. إذا بدأ بالعربية، أكمل بالعربية فقط). ممنوع خلط اللغات أو الرد بلغة مختلفة.
+2. ممنوع استخدام الإيموجي نهائياً. استخدم النص فقط.
+3. لا تذكر كلمة 'REGISTER_ORDER' علناً في الدردشة، هي إشارة داخلية للنظام فقط.
+
+سير عملية الطلب (Order Flow):
+- إذا سأل الزبون عن الدفع، عدّد الطرق المتاحة فقط واسأله عن طريقته المفضلة.
+- بمجرد اختيار الطريقة، أعطه التفاصيل وأسأله: "هل أقوم بتسجيل طلبك لكي يتواصل معك المشرف ويفعله؟".
+- لا تسجل الطلب (بإضافة REGISTER_ORDER) إلا إذا أكد الزبون صراحة (نعم، أكد، Go ahead، إلخ).
+- عند التأكيد، أكتب رسالة تأكيد مهنية بنفس لغة الزبون (مثال: "تم تسجيل طلبك، سيتواصل معك المشرف قريباً") ثم أضف في نهاية النص الكلمة المخفية REGISTER_ORDER.
+
+المنتجات والأسعار:
 ${productsContext}
-RULES:
-- Only sell listed products.
-- No emojis.
-- Respond in the user's language.
-- STRICT LANGUAGE RULE: 
-  - If the user speaks Arabic or Algerian Darija, you MUST use ARABIC SCRIPT (الحروف العربية) ONLY. 
-  - DO NOT use Latin characters for Arabic (No "Salam", "Labas"). Use "سلام", "لاباس".
-  - If the user speaks French/English, use Latin script.
-- Be helpful and professional.
-- IF selecting BaridiMob, use RIP: ${BUSINESS_INFO.baridimob_rip}, Name: ${BUSINESS_INFO.baridimob_name}.`
-            },
-            ...history.slice(-6).map(h => ({
-                "role": h.role === 'user' ? 'user' : 'assistant',
-                "content": h.text
-            })),
-            { "role": "user", "content": userMessage }
+
+ملاحظة بخصوص ChatGPT Plus: يمكن تغيير الإيميل والباسوورد لأننا نسلم إيميل الحساب أيضاً.
+ملاحظة بخصوص Canva Reseller: هذا الاشتراك مدته 3 سنوات ويسمح للزبون بإضافة 500 شخص.
+
+طرق الدفع:
+- CCP: 27875484 (المفتاح 73).
+- RIP: ${BUSINESS_INFO.baridimob_rip} (الاسم: ${BUSINESS_INFO.baridimob_name}).
+- Binance ID: ${BUSINESS_INFO.binance_id}.
+- USDT (TRC20): ${BUSINESS_INFO.usdt_trc20}.
+- USDT (BEP20): ${BUSINESS_INFO.usdt_bep20}.`
+            }
         ];
+
+        // إضافة السجل
+        messages.push(...history.slice(-6).map(h => ({
+            "role": h.role === 'user' ? 'user' : 'assistant',
+            "content": [{ "type": "text", "text": h.text }]
+        })));
+
+        messages.push({ "role": "user", "content": content });
 
         const result = await client.chat.send({
             model: "google/gemini-2.5-flash",
             messages: messages
         });
 
-        if (result.choices && result.choices[0]?.message?.content) {
-            return result.choices[0].message.content;
-        } else {
-            console.error("❌ SDK Response Error:", JSON.stringify(result));
-            return "مرحباً! كيفاش نساعدك اليوم؟";
+        let aiText = result.choices[0]?.message?.content || "";
+
+        // حماية: إذا خرجت الكلمة البرمجية بشكل خاطئ أو في رسالة نصية
+        if (aiText.includes('RECEIPT_DETECTED')) {
+            if (imageBase64) {
+                return "✅ شكراً لك، لقد وصلتني صورة الوصل. سيأتي المشرف ليفعل حسابك في أقرب وقت (5-30 دقيقة).";
+            } else {
+                // إذا قالها في رسالة نصية بدون صورة، نحذف الكلمة ونرد بشكل طبيعي
+                aiText = aiText.replace('RECEIPT_DETECTED', '').trim() || "كيف يمكنني مساعدتك؟";
+            }
         }
 
+        return aiText;
     } catch (error) {
-        console.error("❌ SDK Exception:", error);
-        return "سلام! كاين شوية ضغط، راح يجاوبك الأدمين في أقرب وقت.";
+        console.error('AI Error:', error.message);
+        return "أهلاً بك! كيف يمكنني مساعدتك اليوم؟";
     }
 }
 
@@ -152,30 +208,18 @@ RULES:
 }
 */
 
-/**
- * Check if payment info was sent (Notify Admin + Pause AI)
- */
 async function checkPurchaseIntent(userMessage, aiResponse) {
-    const res = aiResponse.toLowerCase();
-
-    // نرسل إشعار فقط إذا البوت أعطى معلومات الدفع الحقيقية
-    const paymentInfoSent = [
-        BUSINESS_INFO.baridimob_rip,
-        BUSINESS_INFO.usdt_trc20,
-        BUSINESS_INFO.usdt_bep20,
-        BUSINESS_INFO.binance_id,
-        BUSINESS_INFO.redotpay
-    ].some(info => info && info !== "ADDRESS_HERE" && info !== "ID_HERE" && res.includes(info.toLowerCase()));
-
-    return paymentInfoSent;
+    // نعتمد الآن على إشارة صريحة من الذكاء الاصطناعي لتسجيل الطلب
+    return aiResponse.includes('REGISTER_ORDER');
 }
 
 async function checkSupportIntent(userMessage) {
     const supportKeywords = [
-        'مشرف', 'ادمن', 'أدمين', 'تكلم مع', 'هدر مع', 'مساعدة',
-        'admin', 'human', 'support', 'agent', 'manager', 'speak', 'talk', 'help'
+        'مشرف', 'ادمن', 'أدمين', 'تكلم مع المشرف', 'تكلم مع ادمن', 'هدر مع المشرف', 'مسير',
+        'admin', 'human', 'support', 'agent', 'manager', 'real person', 'live chat'
     ];
-    return supportKeywords.some(word => userMessage.toLowerCase().includes(word));
+    const msg = userMessage.toLowerCase();
+    return supportKeywords.some(word => msg.includes(word));
 }
 
 export { generateResponse, checkPurchaseIntent, checkSupportIntent };
