@@ -8,7 +8,9 @@ export const PRODUCTS_DATA = {
             price_dzd: 2900,
             price_usd: 12,
             description: "دخول رسمي لمنصة The Real World (خطة Veteran Plan) المفعلة منذ ديسمبر 2024. تشمل كل الكورسات والدردشات الحية (ليست فيديوهات مسجلة فقط).",
-            durations: []
+            durations: [
+                { key: "1month", price_dzd: 2900, price_usd: 12 }
+            ]
         },
         {
             name: "ChatGPT Plus",
@@ -29,7 +31,7 @@ export const PRODUCTS_DATA = {
             delivery_type: "email_password",
             price_dzd: 1200,
             price_usd: 4.5,
-            description: "اشتراك Adobe Creative Cloud كامل - يدعم جهازين (2 Devices) - (إيميل وكلمة سر)",
+            description: "اشتراك Adobe Creative Cloud كامل شامل لأكثر من 20 تطبيقاً احترافياً. حساب خاص (Private Account) يدعم جهازين وتخزين سحابي.",
             durations: [
                 { key: "1month", price_dzd: 1200, price_usd: 4.5 },
                 { key: "2months", price_dzd: 1800, price_usd: 7 },
@@ -56,7 +58,8 @@ export const PRODUCTS_DATA = {
             delivery_type: "email_password",
             price_dzd: 1200,
             price_usd: 4.5,
-            description: "حساب Perplexity AI Pro (إيميل وكلمة سر)",
+            description: "حساب Perplexity AI Pro للبحث الذكي والتحليل الأكاديمي. (حالياً غير متوفر - Sold Out)",
+            available: false,
             durations: []
         },
         {
@@ -68,7 +71,7 @@ export const PRODUCTS_DATA = {
             price_usd: 2.5,
             description: "اشتراك Canva Pro (يرسل الزبون إيميله الشخصي لاستقبال دعوة التفعيل)",
             durations: [
-                { key: "standard", price_dzd: 600, price_usd: 2.5 },
+                { key: "1year", price_dzd: 600, price_usd: 2.5 },
                 { key: "reseller", price_dzd: 3900, price_usd: 16, delivery_type: "full_access", description: "حساب ريسيلر كامل (3 سنوات) مع إيميل التحكم لتغيير المعلومات، يتيح لك إضافة 500 عضو (500 People)" }
             ]
         },
@@ -79,7 +82,7 @@ export const PRODUCTS_DATA = {
             delivery_type: "email_password",
             price_dzd: 800,
             price_usd: 3,
-            description: "محرر فيديو احترافي - يدعم جهازين (2 Devices) - (إيميل وكلمة سر)",
+            description: "محرر فيديو احترافي - حساب خاص بالكامل (Private Account) يدعم جهازين.",
             durations: [
                 { key: "1month", price_dzd: 800, price_usd: 3 },
                 { key: "3months", price_dzd: 1200, price_usd: 4.5 },
@@ -94,7 +97,7 @@ export const PRODUCTS_DATA = {
             delivery_type: "email_password",
             price_dzd: 600,
             price_usd: 2.5,
-            description: "حساب Netflix Premium مشترك (إيميل وكلمة سر)",
+            description: "حساب Netflix Premium مشترك بجودة 4K Ultra HD، مع بروفايل خاص بك (Personal Profile) محمي لضمان خصوصيتك.",
             durations: [
                 { key: "1month", price_dzd: 600, price_usd: 2.5 },
                 { key: "3months", price_dzd: 1200, price_usd: 4.5 },
@@ -108,7 +111,8 @@ export const PRODUCTS_DATA = {
             delivery_type: "email_password",
             price_dzd: 1500,
             price_usd: 6,
-            description: "حساب TradingView Premium (إيميل وكلمة سر)",
+            description: "حساب TradingView Premium للتحليل المالي المتقدم. (حالياً غير متوفر - Sold Out)",
+            available: false,
             durations: []
         },
         {
@@ -145,8 +149,10 @@ export const PRODUCTS_DATA = {
             delivery_type: "email_password",
             price_dzd: 1200,
             price_usd: 4.5,
-            description: "اشتراك Amazon Prime Video مشترك (إيميل وكلمة سر)",
-            durations: []
+            description: "اشتراك Amazon Prime Video لمدة 3 أشهر (إيميل وكلمة سر)",
+            durations: [
+                { key: "3months", price_dzd: 1200, price_usd: 4.5 }
+            ]
         },
         {
             name: "Crunchyroll",
@@ -155,8 +161,10 @@ export const PRODUCTS_DATA = {
             delivery_type: "email_password",
             price_dzd: 1200,
             price_usd: 4.5,
-            description: "اشتراك Crunchyroll Premium (إيميل وكلمة سر)",
-            durations: []
+            description: "اشتراك Crunchyroll Premium لمشاهدة الانمي. حساب مشترك (Shared) لمدة شهر واحد.",
+            durations: [
+                { key: "1month", price_dzd: 1200, price_usd: 4.5 }
+            ]
         },
         {
             name: "HMA VPN",
@@ -165,7 +173,7 @@ export const PRODUCTS_DATA = {
             delivery_type: "activation_key",
             price_dzd: 2000,
             price_usd: 8,
-            description: "اشتراك HMA VPN (كود تفعيل Activation Key)",
+            description: "اشتراك HMA VPN (كود تفعيل Activation Key) يدعم تشغيل أجهزة متعددة في نفس الوقت (Multiple Devices).",
             durations: [
                 { key: "1year", price_dzd: 2000, price_usd: 8 },
                 { key: "2years", price_dzd: 3200, price_usd: 12.8 }
@@ -178,7 +186,7 @@ export const PRODUCTS_DATA = {
             delivery_type: "email_password",
             price_dzd: 2500,
             price_usd: 10,
-            description: "اشتراك Alight Motion Pro (إيميل وكلمة سر)",
+            description: "اشتراك Alight Motion Pro لتصميم الفيديو والأنيميشن. حساب خاص بالكامل (Private Account).",
             durations: [
                 { key: "1year", price_dzd: 2500, price_usd: 10 }
             ]
@@ -190,7 +198,7 @@ export const PRODUCTS_DATA = {
             delivery_type: "email_password",
             price_dzd: 1800,
             price_usd: 7.2,
-            description: "مساعد بحث علمي (إيميل وكلمة سر)",
+            description: "مساعد بحث علمي مدعوم بالذكاء الاصطناعي. حساب مشترك (Shared Account).",
             durations: [
                 { key: "1month", price_dzd: 1800, price_usd: 7.2 },
                 { key: "3months", price_dzd: 3000, price_usd: 12 }
