@@ -8,6 +8,8 @@ import qrcodeTerminal from 'qrcode-terminal';
 import { generateResponse, checkPurchaseIntent, checkSupportIntent } from './ai-handler.js';
 import { fetchCurrentProducts, formatProductsForAI } from './products-fetcher.js';
 import { notifyNewLead, sendNotification, sendNotificationWithButton, startTelegramPolling } from './telegram-notify.js';
+import { sendMetaEvent } from './meta-capi.js';
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
 
 const chatHistory = new Map();
 const pausedChats = new Set();
@@ -79,8 +81,24 @@ async function startBot() {
     }
 
     // بدء مراقبة تلغرام للتفاعلات (الأزرار)
-    startTelegramPolling((chatId) => {
-        resumeChat(chatId);
+    startTelegramPolling(async ({ action, waChatId }) => {
+        if (action === 'resume') {
+            resumeChat(waChatId);
+        } else if (action === 'payment') {
+            console.log(`💰 Manual Payment Confirmation for ${waChatId}`);
+
+            // 1. Send Meta CAPI Event (Purchase)
+            // Note: We use default values but in a real scenario we'd track the last intent
+            await sendMetaEvent('Purchase', { phone: waChatId.split('@')[0] }, {
+                value: 1500, // Default value, can be improved to be dynamic
+                currency: 'DZD',
+                contentName: 'Service Order'
+            });
+
+            // 2. Automated WhatsApp Reply to Customer
+            const successMsg = "🎉 *تم تأكيد دفعك بنجاح!*\n\nشكراً لثقتك بنا. جاري الآن تفعيل اشتراكك وسنرسل لك البيانات في غضون لحظات. استعد للمتعة! 🚀";
+            await sock.sendMessage(waChatId, { text: successMsg });
+        }
     });
 
     sock.ev.on('messages.upsert', async (m) => {
@@ -151,7 +169,7 @@ async function startBot() {
             return;
         }
 
-        // 🖼️ Handle Images (Receipts)
+        // 🖼️ Handle Images (Receipts) - Restored to Original
         if (isImage && !text) {
             console.log(`🖼️ Image received from ${pushName}`);
             const imageReply = "شكراً لك! لقد استلمت الصورة. تم إبلاغ المشرف للتحقق من الوصل وتفعيل اشتراكك في أقرب وقت (عادةً بين 5 إلى 30 دقيقة). إذا كان لديك سؤال آخر يمكنك طرحه هنا.";
@@ -226,6 +244,13 @@ async function startBot() {
                 console.log(`💰 Order Confirmation Detected. Notifying Admin...`);
                 notifyNewLead({ number: chatId, pushname: pushName }, "طلب مبيعات (مؤكد)", text).catch(() => { });
             }
+
+            // 🚨 كشف الوصل الحقيقي عبر الذكاء الاصطناعي
+            if (aiResponse.includes('RECEIPT_DETECTED_TAG')) {
+                console.log(`🖼️ Confirmed Receipt Detected by AI. Notifying Admin...`);
+                await sendNotificationWithButton(`🖼️ *وصل دفع حقيقي (تم تأكيده بالذكاء الاصطناعي)*\n👤 الإسم: ${pushName}\n📱 رابط المحادثة: https://wa.me/${chatId.split('@')[0]}`, chatId);
+            }
+
 
         } catch (error) {
             console.error('❌ Error:', error.message);

@@ -25,7 +25,7 @@ async function sendNotification(message) {
 }
 
 /**
- * إرسال إشعار مع زر لإعادة تفعيل البوت
+ * إرسال إشعار مع أزرار التحكم (تفعيل البوت + تأكيد الدفع)
  */
 async function sendNotificationWithButton(message, chatId) {
     try {
@@ -35,14 +35,19 @@ async function sendNotificationWithButton(message, chatId) {
             text: message,
             parse_mode: 'HTML',
             reply_markup: {
-                inline_keyboard: [[
-                    { text: "🤖 إعادة تفعيل البوت لهذا الزبون", callback_data: `resume_${chatId}` }
-                ]]
+                inline_keyboard: [
+                    [
+                        { text: "🤖 تفعيل البوت لهذا الزبون", callback_data: `resume_${chatId}` }
+                    ],
+                    [
+                        { text: "✅ تأكيد الدفع (CAPI Purchase)", callback_data: `payment_${chatId}` }
+                    ]
+                ]
             }
         });
-        console.log('✅ Telegram notification with button sent');
+        console.log('✅ Telegram notification with buttons sent');
     } catch (error) {
-        console.error('❌ Error sending Telegram button:', error.message);
+        console.error('❌ Error sending Telegram buttons:', error.message);
     }
 }
 
@@ -64,24 +69,26 @@ async function startTelegramPolling(onAction) {
 
                 if (update.callback_query) {
                     const data = update.callback_query.data;
-                    if (data.startsWith('resume_')) {
-                        const waChatId = data.replace('resume_', '');
-                        onAction(waChatId);
+                    const waChatId = data.split('_')[1];
+                    const action = data.split('_')[0];
 
-                        // تأكيد النقر في تلغرام
-                        await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
-                            callback_query_id: update.callback_query.id,
-                            text: "✅ تم إعادة تفعيل البوت بنجاح!"
-                        });
+                    // تنفيذ الأكشن (resume أو payment)
+                    onAction({ action, waChatId });
 
-                        // تحديث الرسالة لتوضيح أنها اكتملت
-                        await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
-                            chat_id: TELEGRAM_CHAT_ID,
-                            message_id: update.callback_query.message.message_id,
-                            text: update.callback_query.message.text + "\n\n✅ <b>تم التفعيل بنجاح</b>",
-                            parse_mode: 'HTML'
-                        });
-                    }
+                    // تأكيد النقر في تلغرام
+                    await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+                        callback_query_id: update.callback_query.id,
+                        text: action === 'resume' ? "✅ تم إعادة تفعيل البوت!" : "✅ تم إرسال حدث الشراء لفيسبوك!"
+                    });
+
+                    // تحديث الرسالة لتوضيح أنها اكتملت
+                    const statusText = action === 'resume' ? "✅ تم التفعيل بنجاح" : "💰 تم تأكيد الدفع وإرسال CAPI";
+                    await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
+                        chat_id: TELEGRAM_CHAT_ID,
+                        message_id: update.callback_query.message.message_id,
+                        text: update.callback_query.message.text + `\n\n${statusText}`,
+                        parse_mode: 'HTML'
+                    });
                 }
             }
         } catch (error) {
