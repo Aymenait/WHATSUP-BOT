@@ -96,9 +96,15 @@ async function startBot() {
             });
 
             // 2. Automated WhatsApp Reply to Customer
-            const successMsg = "🎉 *تم تأكيد دفعك بنجاح!*\n\nشكراً لثقتك بنا. جاري الآن تفعيل اشتراكك وسنرسل لك البيانات في غضون لحظات. استعد للمتعة! 🚀";
-            const sentSuccess = await sock.sendMessage(waChatId, { text: successMsg });
-            botMessageIds.add(sentSuccess.key.id);
+            try {
+                const successMsg = "🎉 *تم تأكيد دفعك بنجاح!*\n\nشكراً لثقتك بنا. جاري الآن تفعيل اشتراكك وسنرسل لك البيانات في غضون لحظات. استعد للمتعة! 🚀";
+                const sentSuccess = await sock.sendMessage(waChatId, { text: successMsg });
+                if (sentSuccess && sentSuccess.key) {
+                    botMessageIds.add(sentSuccess.key.id);
+                }
+            } catch (err) {
+                console.error('❌ Error sending WhatsApp confirmation:', err.message);
+            }
         }
     });
 
@@ -168,7 +174,9 @@ async function startBot() {
             console.log(`🎙️ Voice note received from ${pushName}`);
             const voiceReply = "عذراً، أنا مساعد ذكي أستطيع فهم الرسائل النصية فقط. من فضلك اكتب استفسارك نصياً لأتمكن من مساعدتك فوراً، أو انتظر قليلاً لحين دخول المشرف لسماع رسالتك الصوتية.";
             const sent = await sock.sendMessage(chatId, { text: voiceReply });
-            botMessageIds.add(sent.key.id);
+            if (sent && sent.key) {
+                botMessageIds.add(sent.key.id);
+            }
             return;
         }
 
@@ -177,7 +185,9 @@ async function startBot() {
             console.log(`🖼️ Image received from ${pushName}`);
             const imageReply = "شكراً لك! لقد استلمت الصورة. تم إبلاغ المشرف للتحقق من الوصل وتفعيل اشتراكك في أقرب وقت (عادةً بين 5 إلى 30 دقيقة). إذا كان لديك سؤال آخر يمكنك طرحه هنا.";
             const sent = await sock.sendMessage(chatId, { text: imageReply });
-            botMessageIds.add(sent.key.id);
+            if (sent && sent.key) {
+                botMessageIds.add(sent.key.id);
+            }
 
             // Notify Admin via Telegram with button
             await sendNotificationWithButton(`🖼️ *وصل دفع (صورة)*\n👤 الإسم: ${pushName}\n📱 رابط المحادثة: https://wa.me/${chatId.split('@')[0]}`, chatId);
@@ -195,7 +205,9 @@ async function startBot() {
 
                 const confirmationMsg = "نعم، سأقوم بتبليغ المشرف (Admin) فوراً. سيبقى الرد الآلي مفعلاً لمساعدتك في أي استفسار آخر حتى يتواجد المشرف معك. شكراً لصبرك.";
                 const sent = await sock.sendMessage(chatId, { text: confirmationMsg });
-                botMessageIds.add(sent.key.id);
+                if (sent && sent.key) {
+                    botMessageIds.add(sent.key.id);
+                }
 
                 // نرسل التنبيه في تلغرام مع زر
                 await sendNotificationWithButton(`🆘 *طلب مساعدة مباشرة*\n👤 الإسم: ${pushName}\n💬 الرسالة: ${text}\n📱 رابط المحادثة: https://wa.me/${chatId.split('@')[0]}`, chatId);
@@ -224,7 +236,9 @@ async function startBot() {
 
             // إرسال الرد النصي
             const sentResponse = await sock.sendMessage(chatId, { text: cleanResponse });
-            botMessageIds.add(sentResponse.key.id);
+            if (sentResponse && sentResponse.key) {
+                botMessageIds.add(sentResponse.key.id);
+            }
 
             // ميزة إرسال صورة الـ CCP: ترسل فقط إذا طلب الزبون الـ CCP صراحة
             const ccpKeywords = ['سي سي بي', 'ccp', 'الحساب البريدي', 'رقم الحساب'];
@@ -236,7 +250,9 @@ async function startBot() {
                     image: { url: 'https://i.imgur.com/EzhHkFQ.jpeg' },
                     caption: '📸 صورة بطاقة الـ CCP لتسهيل عملية الدفع.'
                 });
-                botMessageIds.add(sentCcp.key.id); // إضافة المعرف لكي لا يظنه تدخلاً من الأدمن
+                if (sentCcp && sentCcp.key) {
+                    botMessageIds.add(sentCcp.key.id); // إضافة المعرف لكي لا يظنه تدخلاً من الأدمن
+                }
             }
 
             history.push({ role: 'user', text: text });
