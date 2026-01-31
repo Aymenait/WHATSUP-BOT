@@ -97,7 +97,8 @@ async function startBot() {
 
             // 2. Automated WhatsApp Reply to Customer
             const successMsg = "🎉 *تم تأكيد دفعك بنجاح!*\n\nشكراً لثقتك بنا. جاري الآن تفعيل اشتراكك وسنرسل لك البيانات في غضون لحظات. استعد للمتعة! 🚀";
-            await sock.sendMessage(waChatId, { text: successMsg });
+            const sentSuccess = await sock.sendMessage(waChatId, { text: successMsg });
+            botMessageIds.add(sentSuccess.key.id);
         }
     });
 
@@ -114,6 +115,10 @@ async function startBot() {
 
         if (chatId.includes('@g.us')) return;
 
+        // Detect Message Types
+        const isAudio = msg.message.audioMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage;
+        const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+
         if (msg.key.fromMe) {
             if (botMessageIds.has(messageId)) {
                 botMessageIds.delete(messageId);
@@ -126,11 +131,13 @@ async function startBot() {
                 return;
             }
 
-            if (text.length > 0) {
-                console.log(`⚠️ Manual Admin message: Pausing AI for ${chatId}`);
+            // ⛔ توقيف البوت بمجرد تدخل الأدمن (نص، صوت، أو صورة)
+            const isAdminAction = text.length > 0 || isAudio || isImage;
+
+            if (isAdminAction) {
+                console.log(`⚠️ Admin intervened: Pausing AI for ${chatId}`);
                 pausedChats.add(chatId);
 
-                // إعادة ضبط التايمر التلقائي (Auto-Resume) لإعادة التفعيل بعد ساعتين
                 if (autoResumeTimers.has(chatId)) {
                     clearTimeout(autoResumeTimers.get(chatId));
                 }
@@ -147,16 +154,12 @@ async function startBot() {
                 // إرسال إشعار تلغرام مع زر التفعيل
                 await sendNotificationWithButton(`⚠️ <b>توقف الرد الآلي</b>
 👤 الزبون: ${pushName}
-💬 رسالتك: ${text}
+💬 تدخل المشرف برسالة (نصية/صوتية/صورة)
 📱 الرابط: https://wa.me/${chatId.split('@')[0]}
-⏰ <i>سيتم التفعيل تلقائياً بعد 30 دقيقة.</i>`, chatId);
+⏰ <i>سيعود البوت للعمل تلقائياً بعد 30 دقيقة.</i>`, chatId);
             }
             return;
         }
-
-        // Detect Message Types
-        const isAudio = msg.message.audioMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage;
-        const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
 
         if (pausedChats.has(chatId)) return;
 
@@ -229,10 +232,11 @@ async function startBot() {
 
             if (userAskedForCCP && aiResponse.includes('27875484')) {
                 console.log('Sending CCP image to user (Requested)...');
-                await sock.sendMessage(chatId, {
+                const sentCcp = await sock.sendMessage(chatId, {
                     image: { url: 'https://i.imgur.com/EzhHkFQ.jpeg' },
                     caption: '📸 صورة بطاقة الـ CCP لتسهيل عملية الدفع.'
                 });
+                botMessageIds.add(sentCcp.key.id); // إضافة المعرف لكي لا يظنه تدخلاً من الأدمن
             }
 
             history.push({ role: 'user', text: text });

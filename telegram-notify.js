@@ -37,10 +37,8 @@ async function sendNotificationWithButton(message, chatId) {
             reply_markup: {
                 inline_keyboard: [
                     [
-                        { text: "🤖 تفعيل البوت لهذا الزبون", callback_data: `resume_${chatId}` }
-                    ],
-                    [
-                        { text: "✅ تأكيد الدفع (CAPI Purchase)", callback_data: `payment_${chatId}` }
+                        { text: "🤖 إعادة تفعيل البوت", callback_data: `resume_${chatId}` },
+                        { text: "✅ تأكيد الدفع (CAPI)", callback_data: `payment_${chatId}` }
                     ]
                 ]
             }
