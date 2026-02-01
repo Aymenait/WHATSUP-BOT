@@ -111,7 +111,8 @@ ${conversationSummary}
 
 🚀 <i>تواصل معه الآن!</i>
     `;
-    await sendNotification(message);
+    // Use sendNotificationWithButton instead of sendNotification
+    await sendNotificationWithButton(message, contact.number);
 }
 
 export {

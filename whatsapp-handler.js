@@ -246,12 +246,16 @@ async function startBot() {
 
             if (userAskedForCCP && aiResponse.includes('27875484')) {
                 console.log('Sending CCP image to user (Requested)...');
-                const sentCcp = await sock.sendMessage(chatId, {
-                    image: { url: 'https://i.imgur.com/EzhHkFQ.jpeg' },
-                    caption: '📸 صورة بطاقة الـ CCP لتسهيل عملية الدفع.'
-                });
-                if (sentCcp && sentCcp.key) {
-                    botMessageIds.add(sentCcp.key.id); // إضافة المعرف لكي لا يظنه تدخلاً من الأدمن
+                try {
+                    const sentCcp = await sock.sendMessage(chatId, {
+                        image: { url: 'https://images2.imgbox.com/3c/6e/0C5TNoF8_o.jpg' }, // Updated to a more stable host
+                        caption: '📸 صورة بطاقة الـ CCP لتسهيل عملية الدفع.'
+                    });
+                    if (sentCcp && sentCcp.key) {
+                        botMessageIds.add(sentCcp.key.id);
+                    }
+                } catch (imgErr) {
+                    console.error('❌ Failed to send CCP image:', imgErr.message);
                 }
             }
 
