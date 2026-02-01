@@ -15,6 +15,7 @@ const chatHistory = new Map();
 const pausedChats = new Set();
 const botMessageIds = new Set();
 const autoResumeTimers = new Map();
+const contactNames = new Map(); // خارطة لحفظ أسماء الزبائن
 
 const AUTO_RESUME_DELAY = 30 * 60 * 1000; // 30 minutes
 
@@ -121,6 +122,13 @@ async function startBot() {
 
         if (chatId.includes('@g.us')) return;
 
+        // حفظ اسم الزبون الحقيقي لكي لا يختلط مع اسم المشرف لاحقاً
+        if (!msg.key.fromMe && msg.pushName) {
+            contactNames.set(chatId, msg.pushName);
+        }
+
+        const customerName = contactNames.get(chatId) || (chatId.split('@')[0]);
+
         // Detect Message Types
         const isAudio = msg.message.audioMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage;
         const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
@@ -131,9 +139,15 @@ async function startBot() {
                 return;
             }
 
-            // Silent resume via command
-            if (messageText === '!ok' || messageText === '!bot') {
+            // Forced resume/pause via commands
+            if (messageText === '!ok' || messageText === '!bot' || messageText === 'تكلم') {
                 resumeChat(chatId);
+                return;
+            }
+
+            if (messageText === '!stop' || messageText === 'اسكت') {
+                pausedChats.add(chatId);
+                sendNotification(`🛑 <b>إيقاف يدوي:</b> تم إسكات البوت تماماً مع ${customerName}.`);
                 return;
             }
 
@@ -141,17 +155,19 @@ async function startBot() {
             const isAdminAction = text.length > 0 || isAudio || isImage;
 
             if (isAdminAction) {
-                console.log(`⚠️ Admin intervened: Pausing AI for ${chatId}`);
+                console.log(`⚠️ Admin intervened: Pausing AI for ${chatId} (${customerName})`);
                 pausedChats.add(chatId);
 
+                // Clear any existing timer for this chat
                 if (autoResumeTimers.has(chatId)) {
                     clearTimeout(autoResumeTimers.get(chatId));
                 }
 
+                // Set auto-resume after delay
                 const timer = setTimeout(() => {
                     if (pausedChats.has(chatId)) {
                         resumeChat(chatId);
-                        sendNotification(`⏰ <b>تفعيل تلقائي:</b> مرّت 30 دقيقة بدون تدخل، عاد البوت للعمل مع ${pushName}.`);
+                        sendNotification(`⏰ <b>تفعيل تلقائي:</b> مرّت 30 دقيقة بدون تدخل، عاد البوت للعمل مع ${customerName}.`);
                     }
                 }, AUTO_RESUME_DELAY);
 
@@ -159,8 +175,8 @@ async function startBot() {
 
                 // إرسال إشعار تلغرام مع زر التفعيل
                 await sendNotificationWithButton(`⚠️ <b>توقف الرد الآلي</b>
-👤 الزبون: ${pushName}
-💬 تدخل المشرف برسالة (نصية/صوتية/صورة)
+👤 الزبون: ${customerName}
+💬 تدخل المشرف برسالة
 📱 الرابط: https://wa.me/${chatId.split('@')[0]}
 ⏰ <i>سيعود البوت للعمل تلقائياً بعد 30 دقيقة.</i>`, chatId);
             }
