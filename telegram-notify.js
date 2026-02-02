@@ -84,9 +84,21 @@ async function startTelegramPolling(onAction) {
                     await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
                         chat_id: TELEGRAM_CHAT_ID,
                         message_id: update.callback_query.message.message_id,
-                        text: update.callback_query.message.text + `\n\n${statusText}`,
+                        text: update.callback_query.message.text + `\n\n${statusText}\n📱 ${waChatId.split('@')[0]}`,
                         parse_mode: 'HTML'
                     });
+                } else if (update.message && update.message.chat.id.toString() === TELEGRAM_CHAT_ID.toString()) {
+                    const text = update.message.text;
+
+                    if (text === '/stop') {
+                        onAction({ action: 'stop_bot' });
+                    } else if (text === '/start') {
+                        onAction({ action: 'start_bot' });
+                    } else if (text === '/restart') {
+                        onAction({ action: 'restart_bot' });
+                    } else if (text === '/ping') {
+                        sendNotification("🏓 Pong! البوت شغال وعال العال.");
+                    }
                 }
             }
         } catch (error) {

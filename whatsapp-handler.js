@@ -16,22 +16,34 @@ const pausedChats = new Set();
 const botMessageIds = new Set();
 const autoResumeTimers = new Map();
 const contactNames = new Map(); // خارطة لحفظ أسماء الزبائن
+let isBotStoppedGlobal = false; // متغير للتحكم في تشغيل البوت بالكامل
 
 const AUTO_RESUME_DELAY = 30 * 60 * 1000; // 30 minutes
 
 /**
  * دالة لإعادة تفعيل البوت لشات معين
+ * تحذف كل المعرفات المرتبطة بالرقم (normalizedId و chatId)
  */
 function resumeChat(chatId) {
-    if (pausedChats.has(chatId)) {
-        pausedChats.delete(chatId);
-        console.log(`✅ AI Resumed for ${chatId}`);
+    // استخراج الرقم الصافي من أي معرف
+    const digits = chatId.replace(/\D/g, '');
 
-        // مسح التايمر إذا وجد
-        if (autoResumeTimers.has(chatId)) {
-            clearTimeout(autoResumeTimers.get(chatId));
-            autoResumeTimers.delete(chatId);
+    // حذف أي معرف يحتوي على نفس الأرقام
+    for (const pausedId of pausedChats) {
+        if (pausedId.replace(/\D/g, '') === digits || pausedId === chatId || pausedId === digits) {
+            pausedChats.delete(pausedId);
+            console.log(`✅ AI Resumed: Removed ${pausedId}`);
         }
+    }
+
+    // مسح التايمر إذا وجد
+    if (autoResumeTimers.has(digits)) {
+        clearTimeout(autoResumeTimers.get(digits));
+        autoResumeTimers.delete(digits);
+    }
+    if (autoResumeTimers.has(chatId)) {
+        clearTimeout(autoResumeTimers.get(chatId));
+        autoResumeTimers.delete(chatId);
     }
 }
 
@@ -85,6 +97,15 @@ async function startBot() {
     startTelegramPolling(async ({ action, waChatId }) => {
         if (action === 'resume') {
             resumeChat(waChatId);
+        } else if (action === 'stop_bot') {
+            isBotStoppedGlobal = true;
+            sendNotification("🛑 <b>تم إيقاف البوت بالكامل!</b> لن يرد على أي رسالة حتى تقوم بتفعيله.");
+        } else if (action === 'start_bot') {
+            isBotStoppedGlobal = false;
+            sendNotification("🚀 <b>تم تفعيل البوت بالكامل!</b> عاد للعمل والرد على الجميع.");
+        } else if (action === 'restart_bot') {
+            await sendNotification("🔄 <b>جاري إعادة تشغيل البوت...</b> انتظر 10 ثواني.");
+            process.exit(1); // كوييب سيعيد تشغيله تلقائياً
         } else if (action === 'payment') {
             console.log(`💰 Manual Payment Confirmation for ${waChatId}`);
 
@@ -113,21 +134,40 @@ async function startBot() {
         const msg = m.messages[0];
         if (!msg.message || msg.key.remoteJid === 'status@broadcast') return;
 
+        // فحص إذا كان البوت موقوفاً بطلب عام
+        if (isBotStoppedGlobal && !msg.key.fromMe) return;
+
         const chatId = msg.key.remoteJid;
+        // استخراج الأرقام فقط (حل نهائي لمشكلة الأيفون والـ LID/JID)
+        const normalizedId = chatId.replace(/\D/g, '');
         const pushName = msg.pushName || 'User';
         const messageId = msg.key.id;
 
-        let text = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+        // دالة لاستخراج النص من مختلف أنواع الرسائل (بما فيها الرسائل المختفية)
+        const getMessageText = (m) => {
+            const message = m.message;
+            if (!message) return '';
+
+            // التعامل مع الرسائل المختفية أو التي تشاهد مرة واحدة
+            const content = message.ephemeralMessage?.message || message.viewOnceMessage?.message || message.viewOnceMessageV2?.message || message;
+
+            return content.conversation ||
+                content.extendedTextMessage?.text ||
+                content.imageMessage?.caption ||
+                content.videoMessage?.caption || '';
+        };
+
+        const text = getMessageText(msg);
         const messageText = text.trim().toLowerCase();
 
         if (chatId.includes('@g.us')) return;
 
-        // حفظ اسم الزبون الحقيقي لكي لا يختلط مع اسم المشرف لاحقاً
+        // حفظ اسم الزبون الحقيقي (باستخدام الرقم الصافي)
         if (!msg.key.fromMe && msg.pushName) {
-            contactNames.set(chatId, msg.pushName);
+            contactNames.set(normalizedId, msg.pushName);
         }
 
-        const customerName = contactNames.get(chatId) || (chatId.split('@')[0]);
+        const customerName = contactNames.get(normalizedId) || normalizedId;
 
         // Detect Message Types
         const isAudio = msg.message.audioMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage;
@@ -141,49 +181,66 @@ async function startBot() {
 
             // Forced resume/pause via commands
             if (messageText === '!ok' || messageText === '!bot' || messageText === 'تكلم') {
-                resumeChat(chatId);
+                resumeChat(normalizedId);
                 return;
             }
 
             if (messageText === '!stop' || messageText === 'اسكت') {
-                pausedChats.add(chatId);
+                pausedChats.add(normalizedId);
+                // إضافة حالة خاصة لـ LID الأيفون
+                if (chatId.includes('@lid')) pausedChats.add(chatId);
+
                 sendNotification(`🛑 <b>إيقاف يدوي:</b> تم إسكات البوت تماماً مع ${customerName}.`);
                 return;
             }
 
             // ⛔ توقيف البوت بمجرد تدخل الأدمن (نص، صوت، أو صورة)
-            const isAdminAction = text.length > 0 || isAudio || isImage;
+            const isAdminAction = (text.length > 0 && !text.startsWith('!')) || isAudio || isImage;
 
             if (isAdminAction) {
-                console.log(`⚠️ Admin intervened: Pausing AI for ${chatId} (${customerName})`);
+                // نرسل الإشعار فقط إذا لم يكن الشات موقوفاً بالفعل (لمنع التكرار المزعج)
+                if (!pausedChats.has(normalizedId) && !pausedChats.has(chatId)) {
+                    console.log(`⚠️ Admin intervened: Pausing AI for ${normalizedId} (${customerName})`);
+
+                    // تحديد ما إذا كان الرقم هو LID (أيفون) أو رقم حقيقي
+                    const isLID = chatId.includes('@lid');
+                    const displayPhone = isLID ? `⚠️ أيفون (${customerName})` : normalizedId;
+                    const waLink = isLID ? `ابحث عن "${customerName}" في واتساب` : `https://wa.me/${normalizedId}`;
+
+                    // إرسال إشعار تلغرام مع زر التفعيل (مرة واحدة فقط)
+                    await sendNotificationWithButton(`⚠️ <b>توقف الرد الآلي</b>
+👤 الزبون: ${customerName}
+📱 الهاتف: ${displayPhone}
+💬 تدخل المشرف برسالة
+🔗 ${waLink}
+⏰ <i>سيعود البوت للعمل تلقائياً بعد 30 دقيقة.</i>`, normalizedId);
+                }
+
+                // 🔒 قفل مزدوج: نوقف كلا المعرفين لضمان صمت البوت مع الأيفون وغيره
+                pausedChats.add(normalizedId);
                 pausedChats.add(chatId);
 
                 // Clear any existing timer for this chat
-                if (autoResumeTimers.has(chatId)) {
-                    clearTimeout(autoResumeTimers.get(chatId));
+                if (autoResumeTimers.has(normalizedId)) {
+                    clearTimeout(autoResumeTimers.get(normalizedId));
                 }
 
                 // Set auto-resume after delay
                 const timer = setTimeout(() => {
-                    if (pausedChats.has(chatId)) {
-                        resumeChat(chatId);
+                    if (pausedChats.has(normalizedId)) {
+                        resumeChat(normalizedId);
+                        pausedChats.delete(chatId); // حذف الـ chatId أيضاً
                         sendNotification(`⏰ <b>تفعيل تلقائي:</b> مرّت 30 دقيقة بدون تدخل، عاد البوت للعمل مع ${customerName}.`);
                     }
                 }, AUTO_RESUME_DELAY);
 
-                autoResumeTimers.set(chatId, timer);
-
-                // إرسال إشعار تلغرام مع زر التفعيل
-                await sendNotificationWithButton(`⚠️ <b>توقف الرد الآلي</b>
-👤 الزبون: ${customerName}
-💬 تدخل المشرف برسالة
-📱 الرابط: https://wa.me/${chatId.split('@')[0]}
-⏰ <i>سيعود البوت للعمل تلقائياً بعد 30 دقيقة.</i>`, chatId);
+                autoResumeTimers.set(normalizedId, timer);
             }
             return;
         }
 
-        if (pausedChats.has(chatId)) return;
+        // فحص مزدوج للإيقاف (يدعم JID و LID)
+        if (pausedChats.has(normalizedId) || pausedChats.has(chatId)) return;
 
         // 🎙️ Handle Voice Notes
         if (isAudio) {
@@ -215,19 +272,74 @@ async function startBot() {
         console.log(`📩 New message from ${pushName}: ${text}`);
 
         try {
-            // 🚨 إذا طلب الزبون المشرف: نبلغه ونبقي البوت يعمل
-            if (await checkSupportIntent(text)) {
-                console.log(`🆘 Support requested by ${pushName}. Notifying Admin but keeping AI active.`);
+            // ✅ إذا اختار الزبون الخيار 1 (استمرار البوت)
+            if (messageText === '1' || messageText === 'استمر' || messageText === 'continue' || messageText === 'continuer') {
+                // لا نفعل شيئاً خاصاً، البوت يستمر عادياً
+                // الرسالة ستتم معالجتها من AI أدناه
+            }
 
-                const confirmationMsg = "نعم، سأقوم بتبليغ المشرف (Admin) فوراً. سيبقى الرد الآلي مفعلاً لمساعدتك في أي استفسار آخر حتى يتواجد المشرف معك. شكراً لصبرك.";
-                const sent = await sock.sendMessage(chatId, { text: confirmationMsg });
+            // 🛑 إذا اختار الزبون الخيار 2 (توقف البوت)
+            if (messageText === '2' || messageText === 'توقف' || messageText === 'stop' || messageText === 'arrête' || messageText === 'اسكت يا بوت') {
+                pausedChats.add(normalizedId);
+                pausedChats.add(chatId);
+
+                // كشف اللغة من آخر رسالة
+                const detectLanguage = (txt) => {
+                    if (/[àâäéèêëïîôùûüç]/i.test(txt)) return 'fr';
+                    if (/^[a-zA-Z0-9\s.,!?']+$/.test(txt.trim())) return 'en';
+                    return 'ar';
+                };
+                const lang = detectLanguage(text);
+
+                const stopMsgs = {
+                    en: "Got it! I've stopped. The Admin will be with you shortly. 🙏",
+                    fr: "C'est noté ! Je me suis arrêté. L'Admin sera avec vous sous peu. 🙏",
+                    ar: "حاضر كما تشاء، تم التوقف. سينتظرك المشرف في أقرب وقت. 🙏"
+                };
+
+                const sent = await sock.sendMessage(chatId, { text: stopMsgs[lang] });
                 if (sent && sent.key) {
                     botMessageIds.add(sent.key.id);
                 }
 
-                // نرسل التنبيه في تلغرام مع زر
-                await sendNotificationWithButton(`🆘 *طلب مساعدة مباشرة*\n👤 الإسم: ${pushName}\n💬 الرسالة: ${text}\n📱 رابط المحادثة: https://wa.me/${chatId.split('@')[0]}`, chatId);
-                // ملاحظة: لم نضف chatId إلى pausedChats ليبقى البوت شغالاً
+                // 🔔 نرسل الإشعار فقط عند اختيار التوقف
+                await sendNotificationWithButton(`🆘 <b>طلب مساعدة مباشرة</b>
+👤 الإسم: ${customerName}
+📱 الهاتف: ${normalizedId}
+💬 الزبون طلب التحدث مع المشرف
+📱 الرابط: https://wa.me/${normalizedId}`, chatId);
+                return;
+            }
+
+            // 🚨 إذا طلب الزبون المشرف: نسأله عن تفضيله (بدون إشعار فوري)
+            if (await checkSupportIntent(text)) {
+                console.log(`🆘 Support requested by ${pushName}. Providing choice.`);
+
+                // كشف اللغة
+                const detectLanguage = (txt) => {
+                    if (/[àâäéèêëïîôùûüç]/i.test(txt)) return 'fr';
+                    if (/^[a-zA-Z\s.,!?']+$/.test(txt.trim())) return 'en';
+                    return 'ar';
+                };
+                const lang = detectLanguage(text);
+
+                const supportMsgs = {
+                    en: `*Would you prefer:*
+1. I continue helping you prepare your order so the Admin can activate it faster? ⚡
+2. I stop responding and you wait for the Admin?`,
+                    fr: `*Préférez-vous :*
+1. Que je continue à vous aider pour préparer votre commande ? (Plus rapide ⚡)
+2. Que j'arrête et vous laisse attendre l'Admin ?`,
+                    ar: `*هل تفضل:*
+1. أن أستمر في مساعدتك لتجهيز طلبك؟ (أسرع ⚡)
+2. أن أتوقف وأتركك تنتظر المشرف؟`
+                };
+
+                const sent = await sock.sendMessage(chatId, { text: supportMsgs[lang] });
+                if (sent && sent.key) {
+                    botMessageIds.add(sent.key.id);
+                }
+                return; // نتوقف لننتظر اختيار الزبون
             }
 
             const data = await fetchCurrentProducts();
