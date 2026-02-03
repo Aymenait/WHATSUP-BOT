@@ -17,8 +17,39 @@ const BUSINESS_INFO = {
     redotpay: process.env.REDOTPAY_ID || "1117632168"
 };
 
-async function generateResponse(userMessage, productsContext, history = []) {
+async function generateResponse(userMessage, productsContext, history = [], imageBase64 = null, audioBase64 = null) {
     try {
+        const userContent = [];
+
+        // إذا كان هناك نص في رسالة الزبون
+        if (userMessage) {
+            userContent.push({ type: "text", text: userMessage });
+        } else if (!imageBase64 && !audioBase64) {
+            userContent.push({ type: "text", text: "..." }); // رسالة فارغة
+        }
+
+        // إذا كانت هناك صورة
+        if (imageBase64) {
+            userContent.push({
+                type: "image_url",
+                image_url: { url: `data:image/jpeg;base64,${imageBase64}` }
+            });
+            // إذا لم يكن هناك نص، نضيف نصاً توضيحياً
+            if (!userMessage) userContent.push({ type: "text", text: "هذا وصل دفع أو صورة، حللها." });
+        }
+
+        // إذا كان هناك تسجيل صوتي
+        if (audioBase64) {
+            userContent.push({
+                type: "image_url", // نستخدم هذا التنسيق لأنه الأكثر توافقاً مع OpenRouter للميديا
+                image_url: {
+                    url: `data:audio/ogg;base64,${audioBase64}`
+                }
+            });
+            // تعليمات صارمة لعدم ذكر فعل "السمع"
+            userContent.push({ type: "text", text: "أجب على مضمون هذه الرسالة الصوتية مباشرة وبشكل طبيعي دون قول 'سمعت' أو 'استلمت صوتك'." });
+        }
+
         const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -37,10 +68,12 @@ async function generateResponse(userMessage, productsContext, history = []) {
 قواعد صارمة (STRICT RULES):
 1. الرد حصراً بنفس لغة الزبون (الدارجة، العربية الفصحى، الفرنسية، أو الإنجليزية).
 2. ممنوع استخدام الإيموجي نهائياً. استخدم النص فقط.
-3. عند التحية الأولى (مرحبا، سلام، hi، hello) فقط: كن مختصراً واسأل كيف يمكنك المساعدة. لا تسرد المنتجات.
+3. عند التحية الأولى فقط (مرحبا، سلام، hi): كن مختصراً واسأل كيف يمكنك المساعدة. لكن إذا كانت المحادثة مستمرة أو قال الزبون "شكراً" أو "صحيت" (Sahit) أو أي كلمة شكر، رد عليه بودّ وأهلاً بك دون تكرار "كيف أساعدك اليوم" وكأنك بدأت من الصفر.
 4. عندما يسأل الزبون عن منتج أو تفاصيل: أعطه معلومات كاملة ومفصلة.
 5. لا تذكر كلمة 'REGISTER_ORDER' للزبون، هي إشارة داخلية فقط لتنبيه المشرف.
 6. هدفك هو الإقناع والبيع. إذا سأل الزبون عن الثقة، أكد له أن المتجر موثق بضمان كامل ومراجعات حقيقية بموقعنا: ${BUSINESS_INFO.website}.
+7. عند استلام رسالة صوتية أو صورة: ممنوع منعاً باتاً قول "لقد سمعت" أو "استلمت رسالتك الصوتية" أو "وصلتني الصورة". أجب على المضمون والمحتوى مباشرة وكأنك قرأت رسالة نصية.
+8. إذا استلمت صورة وصل دفع، تحقق منه بذكاء. إذا كان حقيقياً، ضع كلمة RECEIPT_DETECTED_TAG في ردك (مخفية للبرنامج).
 
 المعطيات الدقيقة للمنتجات:
 ${productsContext}
@@ -75,7 +108,7 @@ ${productsContext}
                         "role": h.role === 'user' ? 'user' : 'assistant',
                         "content": h.text
                     })),
-                    { "role": "user", "content": userMessage }
+                    { "role": "user", "content": userContent }
                 ]
             })
         });

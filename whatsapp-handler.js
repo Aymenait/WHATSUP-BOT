@@ -248,34 +248,10 @@ async function startBot() {
         // فحص مزدوج للإيقاف (يدعم JID و LID)
         if (pausedChats.has(normalizedId) || pausedChats.has(chatId)) return;
 
-        // 🎙️ Handle Voice Notes
-        if (isAudio) {
-            console.log(`🎙️ Voice note received from ${pushName}`);
-            const voiceReply = "عذراً، أنا مساعد ذكي أستطيع فهم الرسائل النصية فقط. من فضلك اكتب استفسارك نصياً لأتمكن من مساعدتك فوراً، أو انتظر قليلاً لحين دخول المشرف لسماع رسالتك الصوتية.";
-            const sent = await sock.sendMessage(chatId, { text: voiceReply });
-            if (sent && sent.key) {
-                botMessageIds.add(sent.key.id);
-            }
-            return;
-        }
+        // إذا لم تكن هناك رسالة نصية ولا ميديا، نتوقف
+        if (!text && !isAudio && !isImage) return;
 
-        // 🖼️ Handle Images (Receipts) - Restored to Original
-        if (isImage && !text) {
-            console.log(`🖼️ Image received from ${pushName}`);
-            const imageReply = "شكراً لك! لقد استلمت الصورة. تم إبلاغ المشرف للتحقق من الوصل وتفعيل اشتراكك في أقرب وقت (عادةً بين 5 إلى 30 دقيقة). إذا كان لديك سؤال آخر يمكنك طرحه هنا.";
-            const sent = await sock.sendMessage(chatId, { text: imageReply });
-            if (sent && sent.key) {
-                botMessageIds.add(sent.key.id);
-            }
-
-            // Notify Admin via Telegram with button
-            await sendNotificationWithButton(`🖼️ *وصل دفع (صورة)*\n👤 الإسم: ${pushName}\n📱 رابط المحادثة: https://wa.me/${chatId.split('@')[0]}`, chatId);
-            return;
-        }
-
-        if (!text || text.trim().length === 0) return;
-
-        console.log(`📩 New message from ${pushName}: ${text}`);
+        console.log(`📩 New message from ${pushName} (${isAudio ? '🎙️ Audio' : isImage ? '🖼️ Image' : '📝 Text'}): ${text || 'No text'}`);
 
         try {
             // كود معالجة الرسائل العادي يكمل هنا
@@ -285,19 +261,27 @@ async function startBot() {
 
             const history = chatHistory.get(chatId) || [];
             let imageBase64 = null;
+            let audioBase64 = null;
 
             // إذا كانت الرسالة صورة
-            if (msg.message?.imageMessage) {
-                console.log('🖼️ User sent an image, analyzing...');
+            if (isImage) {
+                console.log('🖼️ User sent an image, downloading...');
                 const buffer = await downloadMediaMessage(msg, 'buffer');
                 imageBase64 = buffer.toString('base64');
             }
 
-            // تنفيذ الرد مع تمرير الصورة إن وجدت
-            let aiResponse = await generateResponse(text, context, history, imageBase64);
+            // إذا كانت الرسالة تسجيل صوتي
+            if (isAudio) {
+                console.log('🎙️ User sent a voice note, downloading...');
+                const buffer = await downloadMediaMessage(msg, 'buffer');
+                audioBase64 = buffer.toString('base64');
+            }
+
+            // تنفيذ الرد مع تمرير الميديا إن وجدت
+            let aiResponse = await generateResponse(text, context, history, imageBase64, audioBase64);
 
             // تنظيف الرد من الكلمات البرمجية قبل إرساله للزبون
-            let cleanResponse = aiResponse.replace(/REGISTER_ORDER/g, '').replace(/CONTACT_ADMIN/g, '').replace(/STOP_BOT/g, '').trim();
+            let cleanResponse = aiResponse.replace(/REGISTER_ORDER/g, '').replace(/CONTACT_ADMIN/g, '').replace(/STOP_BOT/g, '').replace(/RECEIPT_DETECTED_TAG/g, '').trim();
 
             // 📢 إشعارات ذكية تعتمد على تاغات الـ AI
             const shouldNotifyAdmin = aiResponse.includes('CONTACT_ADMIN');
