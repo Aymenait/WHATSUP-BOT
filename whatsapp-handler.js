@@ -157,6 +157,12 @@ async function startBot() {
                 content.videoMessage?.caption || '';
         };
 
+        const detectLanguage = (txt) => {
+            if (/[àâäéèêëïîôùûüç]/i.test(txt)) return 'fr';
+            if (/^[a-zA-Z0-9\s.,!?']+$/.test(txt.trim())) return 'en';
+            return 'ar';
+        };
+
         const text = getMessageText(msg);
         const messageText = text.trim().toLowerCase();
 
@@ -272,75 +278,7 @@ async function startBot() {
         console.log(`📩 New message from ${pushName}: ${text}`);
 
         try {
-            // ✅ إذا اختار الزبون الخيار 1 (استمرار البوت)
-            if (messageText === '1' || messageText === 'استمر' || messageText === 'continue' || messageText === 'continuer') {
-                // لا نفعل شيئاً خاصاً، البوت يستمر عادياً
-                // الرسالة ستتم معالجتها من AI أدناه
-            }
-
-            // 🛑 إذا اختار الزبون الخيار 2 (توقف البوت)
-            if (messageText === '2' || messageText === 'توقف' || messageText === 'stop' || messageText === 'arrête' || messageText === 'اسكت يا بوت') {
-                pausedChats.add(normalizedId);
-                pausedChats.add(chatId);
-
-                // كشف اللغة من آخر رسالة
-                const detectLanguage = (txt) => {
-                    if (/[àâäéèêëïîôùûüç]/i.test(txt)) return 'fr';
-                    if (/^[a-zA-Z0-9\s.,!?']+$/.test(txt.trim())) return 'en';
-                    return 'ar';
-                };
-                const lang = detectLanguage(text);
-
-                const stopMsgs = {
-                    en: "Got it! I've stopped. The Admin will be with you shortly. 🙏",
-                    fr: "C'est noté ! Je me suis arrêté. L'Admin sera avec vous sous peu. 🙏",
-                    ar: "حاضر كما تشاء، تم التوقف. سينتظرك المشرف في أقرب وقت. 🙏"
-                };
-
-                const sent = await sock.sendMessage(chatId, { text: stopMsgs[lang] });
-                if (sent && sent.key) {
-                    botMessageIds.add(sent.key.id);
-                }
-
-                // 🔔 نرسل الإشعار فقط عند اختيار التوقف
-                await sendNotificationWithButton(`🆘 <b>طلب مساعدة مباشرة</b>
-👤 الإسم: ${customerName}
-📱 الهاتف: ${normalizedId}
-💬 الزبون طلب التحدث مع المشرف
-📱 الرابط: https://wa.me/${normalizedId}`, chatId);
-                return;
-            }
-
-            // 🚨 إذا طلب الزبون المشرف: نسأله عن تفضيله (بدون إشعار فوري)
-            if (await checkSupportIntent(text)) {
-                console.log(`🆘 Support requested by ${pushName}. Providing choice.`);
-
-                // كشف اللغة
-                const detectLanguage = (txt) => {
-                    if (/[àâäéèêëïîôùûüç]/i.test(txt)) return 'fr';
-                    if (/^[a-zA-Z\s.,!?']+$/.test(txt.trim())) return 'en';
-                    return 'ar';
-                };
-                const lang = detectLanguage(text);
-
-                const supportMsgs = {
-                    en: `*Would you prefer:*
-1. I continue helping you prepare your order so the Admin can activate it faster? ⚡
-2. I stop responding and you wait for the Admin?`,
-                    fr: `*Préférez-vous :*
-1. Que je continue à vous aider pour préparer votre commande ? (Plus rapide ⚡)
-2. Que j'arrête et vous laisse attendre l'Admin ?`,
-                    ar: `*هل تفضل:*
-1. أن أستمر في مساعدتك لتجهيز طلبك؟ (أسرع ⚡)
-2. أن أتوقف وأتركك تنتظر المشرف؟`
-                };
-
-                const sent = await sock.sendMessage(chatId, { text: supportMsgs[lang] });
-                if (sent && sent.key) {
-                    botMessageIds.add(sent.key.id);
-                }
-                return; // نتوقف لننتظر اختيار الزبون
-            }
+            // كود معالجة الرسائل العادي يكمل هنا
 
             const data = await fetchCurrentProducts();
             const context = data ? formatProductsForAI(data) : "منتجاتنا متوفرة.";
@@ -359,13 +297,41 @@ async function startBot() {
             let aiResponse = await generateResponse(text, context, history, imageBase64);
 
             // تنظيف الرد من الكلمات البرمجية قبل إرساله للزبون
-            const cleanResponse = aiResponse.replace(/REGISTER_ORDER/g, '').trim();
+            let cleanResponse = aiResponse.replace(/REGISTER_ORDER/g, '').replace(/CONTACT_ADMIN/g, '').replace(/STOP_BOT/g, '').trim();
+
+            // 📢 إشعارات ذكية تعتمد على تاغات الـ AI
+            const shouldNotifyAdmin = aiResponse.includes('CONTACT_ADMIN');
+            const shouldStopBot = aiResponse.includes('STOP_BOT');
+
+            if (shouldNotifyAdmin) {
+                const lang = detectLanguage(text);
+                const notifyNotes = {
+                    en: "\n\n_(Note: I've also notified the Admin. He'll check his WhatsApp shortly, or you can message him directly via the links above)_",
+                    fr: "\n\n_(Note : J'ai également informé l'Admin. Il consultera son WhatsApp sous peu, ou vous pouvez lui écrire directement via les liens ci-dessus)_",
+                    ar: "\n\n_(ملاحظة: لقد قمت بإخطار المشرف أيضاً. سيقوم بتفقد الواتساب قريباً، أو يمكنك مراسلته مباشرة عبر الروابط أعلاه)_"
+                };
+                cleanResponse += notifyNotes[lang];
+            }
+
             console.log(`🤖 AI Reply: ${cleanResponse}`);
 
             // إرسال الرد النصي
             const sentResponse = await sock.sendMessage(chatId, { text: cleanResponse });
             if (sentResponse && sentResponse.key) {
                 botMessageIds.add(sentResponse.key.id);
+            }
+
+            // تنفيذ الإيقاف إذا طلب الـ AI ذلك (بناءً على فهم سياق الزبون)
+            if (shouldStopBot) {
+                console.log(`🛑 AI decided to STOP for ${normalizedId}`);
+                pausedChats.add(normalizedId);
+                pausedChats.add(chatId);
+
+                await sendNotificationWithButton(`🛑 <b>الزبون طلب إيقاف البوت</b>
+👤 الإسم: ${pushName}
+📱 الهاتف: ${normalizedId}
+💬 السياق: الزبون طلب التوقف أو الهدوء.
+📱 الرابط: https://wa.me/${normalizedId}`, chatId);
             }
 
             // ميزة إرسال صورة الـ CCP: ترسل فقط إذا طلب الزبون الـ CCP صراحة
@@ -376,7 +342,7 @@ async function startBot() {
                 console.log('Sending CCP image to user (Requested)...');
                 try {
                     const sentCcp = await sock.sendMessage(chatId, {
-                        image: { url: 'https://images2.imgbox.com/3c/6e/0C5TNoF8_o.jpg' }, // Updated to a more stable host
+                        image: { url: 'https://images2.imgbox.com/3c/6e/0C5TNoF8_o.jpg' },
                         caption: '📸 صورة بطاقة الـ CCP لتسهيل عملية الدفع.'
                     });
                     if (sentCcp && sentCcp.key) {
@@ -389,7 +355,7 @@ async function startBot() {
 
             history.push({ role: 'user', text: text });
             history.push({ role: 'assistant', text: cleanResponse });
-            if (history.length > 12) history.shift(); // Increased memory to 12
+            if (history.length > 12) history.shift();
             chatHistory.set(chatId, history);
 
             if (aiResponse.includes('REGISTER_ORDER')) {
@@ -397,17 +363,14 @@ async function startBot() {
                 notifyNewLead({ number: chatId, pushname: pushName }, "طلب مبيعات (مؤكد)", text).catch(() => { });
             }
 
-            // 📢 إشعار عند إرسال روابط التواصل الاجتماعي (تليجرام أو انستغرام)
-            const socialKeywords = ['t.me/AYMENAIT', 'instagram.com/market_algeriaa', '@AYMENAIT', '@market_algeriaa'];
-            const sentSocialLinks = socialKeywords.some(link => aiResponse.includes(link));
-
-            if (sentSocialLinks) {
-                console.log(`🔗 Social links sent to user. Notifying Admin...`);
-                await sendNotificationWithButton(`🔗 <b>تم إرسال روابط التواصل الاجتماعي</b>
+            // الإخطار التلغرام الذكي
+            if (shouldNotifyAdmin) {
+                console.log(`🔗 Smart Handover Detected. Notifying Admin...`);
+                await sendNotificationWithButton(`🔗 <b>طلب تواصل مباشرة (Handover)</b>
 👤 الإسم: ${pushName}
 📱 الهاتف: ${normalizedId}
-💬 الزبون قد ينتقل للتواصل معك هناك.
-✅ <i>يمكنك تأكيد البيع إذا اشترى من هناك.</i>`, chatId);
+💬 الزبون يريد التحدث معك أو حصل على روابطك.
+✅ <i>يمكنك الرد عليه في واتساب أو انتظار تواصله في المنصات الأخرى.</i>`, chatId);
             }
 
             // 🚨 كشف الوصل الحقيقي عبر الذكاء الاصطناعي
