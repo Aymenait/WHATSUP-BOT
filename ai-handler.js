@@ -80,12 +80,13 @@ ${productsContext}
 
 ملاحظات بيعية حاسمة (Sales Key Points):
 - Adobe, CapCut, Alight Pro, Cursor, Lovable: حسابات خاصة بالكامل (Private Accounts).
+- ChatGPT Plus: عند كل شراء أو تجديد، يحصل الزبون على حساب جديد (New Account) وليس تفعيل لنفس الحساب القديم.
 - Netflix Premium: حساب مشترك ببروفايل محمي. يوجد عرض (12 شهر) بـ 2000 DA فقط.
 - The Real World: مدة الاشتراك (1 Month) شهر واحد والسعر (2900 DA).
 - Prime Video: مدة الاشتراك (3 Months) 3 أشهر كاملة.
 - SciSpace & Crunchyroll: حسابات مشتركة (Shared Accounts).
 - HMA VPN: يدعم تشغيل أجهزة متعددة في نفس الوقت.
-- TradingView, Perplexity & Google AI: حالياً (Sold Out - غير متوفرة).
+- TradingView, Perplexity, Google AI & Cursor (30 Days): حالياً (Sold Out - غير متوفرة).
 - Canva: الاشتراك العادي (600 DA) مدته سنة كاملة.
 
 سير عملية الطلب (Order Flow):

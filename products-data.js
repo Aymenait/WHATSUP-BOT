@@ -34,8 +34,8 @@ export const PRODUCTS_DATA = {
             description: "اشتراك Adobe Creative Cloud كامل شامل لأكثر من 20 تطبيقاً احترافياً. حساب خاص (Private Account) يدعم جهازين وتخزين سحابي.",
             durations: [
                 { key: "1month", price_dzd: 1200, price_usd: 4.5 },
-                { key: "2months", price_dzd: 1800, price_usd: 7 },
-                { key: "3months", price_dzd: 2500, price_usd: 10 }
+                { key: "2months", price_dzd: 2200, price_usd: 8.5 },
+                { key: "3months", price_dzd: 2900, price_usd: 11.6 }
             ]
         },
         {
@@ -125,7 +125,7 @@ export const PRODUCTS_DATA = {
             description: "محرر أكواد ذكي (إيميل وكلمة سر)",
             durations: [
                 { key: "7days", price_dzd: 900, price_usd: 3.6 },
-                { key: "30days", price_dzd: 3800, price_usd: 15.2 }
+                { key: "30days", price_dzd: 3800, price_usd: 15.2, available: false }
             ]
         },
         {
@@ -203,6 +203,17 @@ export const PRODUCTS_DATA = {
                 { key: "1month", price_dzd: 1800, price_usd: 7.2 },
                 { key: "3months", price_dzd: 3000, price_usd: 12 }
             ]
+        },
+        {
+            name: "Google AI Premium",
+            category: "AI Chat & Gemini",
+            keywords: ["google ai", "gemini ultra", "gemini pro", "google assistant", "ai productivity"],
+            delivery_type: "email_password",
+            price_dzd: 1800,
+            price_usd: 8,
+            description: "اشتراك Gemini Ultra و Veo 3 مع أدوات إنتاجية متقدمة. (حالياً غير متوفر - Sold Out)",
+            available: false,
+            durations: []
         }
     ],
     payment_methods: [

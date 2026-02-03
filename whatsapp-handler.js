@@ -18,7 +18,7 @@ const autoResumeTimers = new Map();
 const contactNames = new Map(); // خارطة لحفظ أسماء الزبائن
 let isBotStoppedGlobal = false; // متغير للتحكم في تشغيل البوت بالكامل
 
-const AUTO_RESUME_DELAY = 30 * 60 * 1000; // 30 minutes
+const AUTO_RESUME_DELAY = 2 * 60 * 60 * 1000; // 2 hours
 
 /**
  * دالة لإعادة تفعيل البوت لشات معين
