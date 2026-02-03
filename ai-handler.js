@@ -7,7 +7,8 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const BUSINESS_INFO = {
     name: process.env.BUSINESS_NAME || "Market Algeria",
     website: process.env.BUSINESS_WEBSITE || "https://marketalgeria.store",
-    instagram: process.env.BUSINESS_INSTAGRAM || "@aymenmarket",
+    instagram: process.env.BUSINESS_INSTAGRAM || "@marketalgeriaa",
+    telegram: "@AYMENAIT",
     baridimob_rip: process.env.BARIDIMOB_RIP || "00799999002787548473",
     baridimob_name: process.env.BARIDIMOB_NAME || "AIT AMARA AYMENE",
     usdt_trc20: process.env.USDT_TRC20 || "TWTgY41LNFqZcgBiRCZYsSq6ooeCx8gus9",
@@ -60,7 +61,9 @@ ${productsContext}
 - اسأله دائماً: "هل أقوم بتسجيل طلبك لكي يتولى المشرف تفعيله لك فوراً؟".
 - لا تضف كلمة REGISTER_ORDER إلا بعد تأكيد الزبون (اوكي، نعم، سجل، إلخ).
 
-طرق الدفع:
+طرق التواصل والدفع:
+- تفضل بالتواصل مع المشرف على تليجرام: ${BUSINESS_INFO.telegram} (الرابط: https://t.me/${BUSINESS_INFO.telegram.replace('@', '')}).
+- حساب انستغرام: ${BUSINESS_INFO.instagram} (الرابط: https://instagram.com/${BUSINESS_INFO.instagram.replace('@', '')}).
 - CCP: 27875484 (المفتاح 73).
 - RIP: ${BUSINESS_INFO.baridimob_rip} (الاسم: ${BUSINESS_INFO.baridimob_name}).
 - Binance Pay ID: ${BUSINESS_INFO.binance_id}.
