@@ -27,15 +27,15 @@ export const PRODUCTS_DATA = {
         {
             name: "Adobe Creative Cloud",
             category: "Design & Creative",
-            keywords: ["photoshop", "illustrator", "premiere", "design", "video editing", "designer"],
+            keywords: ["photoshop", "illustrator", "premiere", "design", "video editing", "designer", "firefly credits", "ai design"],
             delivery_type: "email_password",
-            price_dzd: 1200,
-            price_usd: 4.5,
-            description: "اشتراك Adobe Creative Cloud كامل شامل لأكثر من 20 تطبيقاً احترافياً. حساب خاص (Private Account) يدعم جهازين وتخزين سحابي.",
+            price_dzd: 1500,
+            price_usd: 5.5,
+            description: "حساب Adobe Creative Cloud جديد خاص بك (Private Account) مع تحكم كامل. يشمل أكثر من 20 تطبيقاً احترافياً (Photoshop, Illustrator, Premiere Pro, After Effects) + 4000 نقطة للذكاء الاصطناعي (Firefly Credits). يدعم جهازين مع إمكانية تغيير الإيميل والباسورد وضمان كامل طول فترة الاشتراك.",
             durations: [
-                { key: "1month", price_dzd: 1500, price_usd: 5.5 },
-                { key: "2months", price_dzd: 2500, price_usd: 9.2 },
-                { key: "3months", price_dzd: 3200, price_usd: 11.8 }
+                { key: "1month", price_dzd: 1500, price_usd: 5.5, description: "اشتراك رسمي لمدة 30 يوم" },
+                { key: "2months", price_dzd: 2500, price_usd: 9.2, description: "اشتراك رسمي لمدة 60 يوم" },
+                { key: "3months", price_dzd: 3200, price_usd: 11.8, description: "اشتراك رسمي لمدة 90 يوم كاملة" }
             ]
         },
         {
