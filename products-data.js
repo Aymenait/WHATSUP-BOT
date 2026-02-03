@@ -33,9 +33,9 @@ export const PRODUCTS_DATA = {
             price_usd: 4.5,
             description: "اشتراك Adobe Creative Cloud كامل شامل لأكثر من 20 تطبيقاً احترافياً. حساب خاص (Private Account) يدعم جهازين وتخزين سحابي.",
             durations: [
-                { key: "1month", price_dzd: 1200, price_usd: 4.5 },
-                { key: "2months", price_dzd: 2200, price_usd: 8.5 },
-                { key: "3months", price_dzd: 2900, price_usd: 11.6 }
+                { key: "1month", price_dzd: 1500, price_usd: 5.5 },
+                { key: "2months", price_dzd: 2500, price_usd: 9.2 },
+                { key: "3months", price_dzd: 3200, price_usd: 11.8 }
             ]
         },
         {
