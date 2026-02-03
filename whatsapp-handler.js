@@ -397,6 +397,19 @@ async function startBot() {
                 notifyNewLead({ number: chatId, pushname: pushName }, "طلب مبيعات (مؤكد)", text).catch(() => { });
             }
 
+            // 📢 إشعار عند إرسال روابط التواصل الاجتماعي (تليجرام أو انستغرام)
+            const socialKeywords = ['t.me/AYMENAIT', 'instagram.com/market_algeriaa', '@AYMENAIT', '@market_algeriaa'];
+            const sentSocialLinks = socialKeywords.some(link => aiResponse.includes(link));
+
+            if (sentSocialLinks) {
+                console.log(`🔗 Social links sent to user. Notifying Admin...`);
+                await sendNotificationWithButton(`🔗 <b>تم إرسال روابط التواصل الاجتماعي</b>
+👤 الإسم: ${pushName}
+📱 الهاتف: ${normalizedId}
+💬 الزبون قد ينتقل للتواصل معك هناك.
+✅ <i>يمكنك تأكيد البيع إذا اشترى من هناك.</i>`, chatId);
+            }
+
             // 🚨 كشف الوصل الحقيقي عبر الذكاء الاصطناعي
             if (aiResponse.includes('RECEIPT_DETECTED_TAG')) {
                 console.log(`🖼️ Confirmed Receipt Detected by AI. Notifying Admin...`);

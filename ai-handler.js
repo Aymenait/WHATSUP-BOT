@@ -7,7 +7,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const BUSINESS_INFO = {
     name: process.env.BUSINESS_NAME || "Market Algeria",
     website: process.env.BUSINESS_WEBSITE || "https://marketalgeria.store",
-    instagram: process.env.BUSINESS_INSTAGRAM || "@marketalgeriaa",
+    instagram: process.env.BUSINESS_INSTAGRAM || "@market_algeriaa",
     telegram: "@AYMENAIT",
     baridimob_rip: process.env.BARIDIMOB_RIP || "00799999002787548473",
     baridimob_name: process.env.BARIDIMOB_NAME || "AIT AMARA AYMENE",
