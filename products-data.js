@@ -78,11 +78,11 @@ export const PRODUCTS_DATA = {
         {
             name: "CapCut Pro",
             category: "Video Editing",
-            keywords: ["video editor", "tiktok", "reels", "ai video"],
+            keywords: ["video editor", "tiktok", "reels", "ai video", "no watermark"],
             delivery_type: "email_password",
             price_dzd: 800,
             price_usd: 3,
-            description: "محرر فيديو احترافي - حساب خاص بالكامل (Private Account) يدعم جهازين.",
+            description: "محرر فيديو احترافي مع خصوصية تامة لمحتواك (مساحة عمل خاصة). يدعم التصدير بجودة 4K بدون علامة مائية مع ضمان كامل طوال فترة الاشتراك.",
             durations: [
                 { key: "1month", price_dzd: 800, price_usd: 3 },
                 { key: "3months", price_dzd: 1200, price_usd: 4.5 },
@@ -186,7 +186,7 @@ export const PRODUCTS_DATA = {
             delivery_type: "email_password",
             price_dzd: 2500,
             price_usd: 10,
-            description: "اشتراك Alight Motion Pro لتصميم الفيديو والأنيميشن. حساب خاص بالكامل (Private Account).",
+            description: "اشتراك Alight Motion Pro سنوي (1 سنة). حساب خاص بالكامل (Private Account) مع تحكم كامل، يمكنك تغيير الإيميل والباسورد وكافة معلومات الحساب بنفسك. مثالي لتصميم الأنيميشن والموشن جرافيك.",
             durations: [
                 { key: "1year", price_dzd: 2500, price_usd: 10 }
             ]
