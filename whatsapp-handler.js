@@ -214,13 +214,44 @@ async function startBot() {
 
         // تسجيل الرسالة فوراً قبل التحقق من حالة التوقف
         if (msg.key.fromMe) {
-            // نسجل رسائل الأدمن فقط إذا لم تكن من البوت نفسه (لتفادي التكرار)
             if (!botMessageIds.has(messageId)) {
-                await updateHistoryPassively('assistant', text || (msg.message.imageMessage ? '(صورة)' : '(وسائط)'));
+                let contentToSave = text;
+                const isAudio = msg.message?.audioMessage;
+
+                if (isAudio) {
+                    try {
+                        console.log('🎙️ Admin sent a vocal, transcribing for memory...');
+                        const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
+                        const { generateAudioSummary } = await import('./ai-handler.js');
+                        const summary = await generateAudioSummary(buffer);
+                        contentToSave = `🎙️ (فوكال من الأدمن): ${summary}`;
+                    } catch (e) {
+                        console.error('Error transcribing admin vocal:', e.message);
+                        contentToSave = '🎙️ (فوكال من الأدمن)';
+                    }
+                } else if (msg.message?.imageMessage) {
+                    contentToSave = '(صورة من الأدمن)';
+                }
+
+                await updateHistoryPassively('assistant', contentToSave || '(وسائط)');
             }
         } else {
             // نسجل رسائل الزبون دائماً في الخلفية
-            await updateHistoryPassively('user', text || (msg.message.imageMessage ? '(صورة)' : '(وسائط)'));
+            // ملاحظة: الزبون يتم معالجة فوكاله بالفعل في البلوك الأساسي، 
+            // لكن للوضع الصامت سنحتاج منطق مشابه هنا أيضاً لضمان الدقة 100%
+            let customerContent = text;
+            if (!text && msg.message?.audioMessage && (isBotStoppedGlobal || pausedChats.has(normalizedId))) {
+                try {
+                    const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
+                    const { generateAudioSummary } = await import('./ai-handler.js');
+                    const summary = await generateAudioSummary(buffer);
+                    customerContent = `🎙️ (فوكال): ${summary}`;
+                } catch (e) { customerContent = '🎙️ (صوت)'; }
+            } else if (!text && msg.message?.imageMessage) {
+                customerContent = '(صورة)';
+            }
+
+            await updateHistoryPassively('user', customerContent || '(وسائط)');
         }
 
         // الآن نفحص إذا كان البوت موقوفاً لكي لا يرد (لكن الذاكرة تم تحديثها أعلاه)
