@@ -11,7 +11,7 @@ import { notifyNewLead, sendNotification, sendNotificationWithButton, startTeleg
 import { sendMetaEvent } from './meta-capi.js';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import mongoose from 'mongoose';
-import History from './models/History.js';
+import History from './History.js';
 import { saveSaleToSheet } from './sheets-logger.js';
 
 // 🗄️ الاتصال بقاعدة البيانات
