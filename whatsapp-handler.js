@@ -222,8 +222,9 @@ async function startBot() {
                     try {
                         console.log('🎙️ Admin sent a vocal, transcribing for memory...');
                         const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
+                        const audioBase64 = buffer.toString('base64');
                         const { generateAudioSummary } = await import('./ai-handler.js');
-                        const summary = await generateAudioSummary(buffer);
+                        const summary = await generateAudioSummary(audioBase64);
                         contentToSave = `🎙️ (فوكال من الأدمن): ${summary}`;
                     } catch (e) {
                         console.error('Error transcribing admin vocal:', e.message);
@@ -242,9 +243,11 @@ async function startBot() {
             let customerContent = text;
             if (!text && msg.message?.audioMessage && (isBotStoppedGlobal || pausedChats.has(normalizedId))) {
                 try {
+                    console.log('🎙️ Capturing customer vocal during pause...');
                     const buffer = await downloadMediaMessage(msg, 'buffer', {}, { logger: console });
+                    const audioBase64 = buffer.toString('base64');
                     const { generateAudioSummary } = await import('./ai-handler.js');
-                    const summary = await generateAudioSummary(buffer);
+                    const summary = await generateAudioSummary(audioBase64);
                     customerContent = `🎙️ (فوكال): ${summary}`;
                 } catch (e) { customerContent = '🎙️ (صوت)'; }
             } else if (!text && msg.message?.imageMessage) {
