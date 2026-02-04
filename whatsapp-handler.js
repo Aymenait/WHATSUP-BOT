@@ -305,17 +305,41 @@ async function startBot() {
                 botMessageIds.add(sentResponse.key.id);
             }
 
-            // تنفيذ الإيقاف إذا طلب الـ AI ذلك (بناءً على فهم سياق الزبون)
-            if (shouldStopBot) {
-                console.log(`🛑 AI decided to STOP for ${normalizedId}`);
-                pausedChats.add(normalizedId);
-                pausedChats.add(chatId);
-
-                await sendNotificationWithButton(`🛑 <b>الزبون طلب إيقاف البوت</b>
+            // 📢 إخطارات تلغرام الذكية
+            if (shouldNotifyAdmin || shouldStopBot) {
+                let notifyMsg = "";
+                if (shouldNotifyAdmin && shouldStopBot) {
+                    notifyMsg = `🔗 <b>طلب تواصل مباشر + إيقاف البوت</b>
+👤 الإسم: ${pushName}
+📱 الهاتف: ${normalizedId}
+💬 آخر رسالة: <i>"${text || '(وسائط)'}"</i>
+✅ <b>تم إيقاف البوت تلقائياً</b> للسماح لك بالرد.
+📱 الرابط: https://wa.me/${normalizedId}`;
+                } else if (shouldNotifyAdmin) {
+                    notifyMsg = `🔗 <b>طلب تواصل مباشرة (Handover)</b>
+👤 الإسم: ${pushName}
+📱 الهاتف: ${normalizedId}
+💬 آخر رسالة: <i>"${text || '(وسائط)'}"</i>
+✅ <i>يمكنك الرد عليه في واتساب حالاً.</i>`;
+                } else if (shouldStopBot) {
+                    notifyMsg = `🛑 <b>تم إيقاف البوت (طلب الزبون)</b>
 👤 الإسم: ${pushName}
 📱 الهاتف: ${normalizedId}
 💬 السياق: الزبون طلب التوقف أو الهدوء.
-📱 الرابط: https://wa.me/${normalizedId}`, chatId);
+📱 الرابط: https://wa.me/${normalizedId}`;
+                }
+
+                if (notifyMsg) {
+                    console.log(`📡 Sending Smart Notification: ${shouldNotifyAdmin ? 'Handover' : 'Stop'}`);
+                    await sendNotificationWithButton(notifyMsg, chatId);
+                }
+
+                // تنفيذ الإيقاف الفعلي في الكود
+                if (shouldStopBot) {
+                    console.log(`🛑 Pausing AI for ${normalizedId}`);
+                    pausedChats.add(normalizedId);
+                    pausedChats.add(chatId);
+                }
             }
 
             // ميزة إرسال صورة الـ CCP: ترسل فقط إذا طلب الزبون الـ CCP صراحة
@@ -339,22 +363,12 @@ async function startBot() {
 
             history.push({ role: 'user', text: text });
             history.push({ role: 'assistant', text: cleanResponse });
-            if (history.length > 12) history.shift();
+            if (history.length > 20) history.shift();
             chatHistory.set(chatId, history);
 
             if (aiResponse.includes('REGISTER_ORDER')) {
                 console.log(`💰 Order Confirmation Detected. Notifying Admin...`);
                 notifyNewLead({ number: chatId, pushname: pushName }, "طلب مبيعات (مؤكد)", text).catch(() => { });
-            }
-
-            // الإخطار التلغرام الذكي
-            if (shouldNotifyAdmin) {
-                console.log(`🔗 Smart Handover Detected. Notifying Admin...`);
-                await sendNotificationWithButton(`🔗 <b>طلب تواصل مباشرة (Handover)</b>
-👤 الإسم: ${pushName}
-📱 الهاتف: ${normalizedId}
-💬 الزبون يريد التحدث معك أو حصل على روابطك.
-✅ <i>يمكنك الرد عليه في واتساب أو انتظار تواصله في المنصات الأخرى.</i>`, chatId);
             }
 
             // 🚨 كشف الوصل الحقيقي عبر الذكاء الاصطناعي

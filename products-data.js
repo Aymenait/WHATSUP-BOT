@@ -13,15 +13,17 @@ export const PRODUCTS_DATA = {
             ]
         },
         {
-            name: "ChatGPT Plus",
+            name: "ChatGPT Plus & Business",
             category: "AI Chat & Assistant",
-            keywords: ["gpt-4", "gpt4", "openai", "writing", "analysis", "ai assistance"],
-            delivery_type: "email_password",
-            price_dzd: 1000,
-            price_usd: 4,
-            description: "حساب ChatGPT Plus شخصي خاص بك (إيميل وكلمة سر)",
+            keywords: ["gpt-4", "gpt4", "gpt5", "gpt-5", "openai", "writing", "analysis", "ai assistance", "business", "workspace"],
+            delivery_type: "email_invite",
+            price_dzd: 1200,
+            price_usd: 6,
+            description: "اشتراك ChatGPT Plus (GPT-4o) أو ChatGPT Business (GPT-5). تفعيل Business يتم عبر إرسال إيميلك الشخصي ودعوتك للـ Workspace.",
             durations: [
-                { key: "plus", price_dzd: 1000, price_usd: 4 }
+                { key: "plus", price_dzd: 1000, price_usd: 4, description: "ChatGPT Plus (GPT-4o) - حساب إيميل وباسورد" },
+                { key: "business", price_dzd: 1200, price_usd: 6, description: "ChatGPT Business (GPT-5) - تفعيل على إيميلك الشخصي (Private Workspace)" },
+                { key: "reseller", price_dzd: 2000, price_usd: 10, description: "عرض الجملة: حساب (إيميل + باسورد) يمكنه استضافة 5 أشخاص إضافيين. التفعيل خلال 5-30 دقيقة بعد الدفع." }
             ]
         },
         {
