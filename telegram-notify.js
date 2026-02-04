@@ -37,8 +37,11 @@ async function sendNotificationWithButton(message, chatId) {
             reply_markup: {
                 inline_keyboard: [
                     [
-                        { text: "🤖 إعادة تفعيل البوت", callback_data: `resume_${chatId}` },
-                        { text: "✅ تأكيد الدفع (CAPI)", callback_data: `payment_${chatId}` }
+                        { text: "🤖 تفعيل البوت", callback_data: `resume_${chatId}` },
+                        { text: "💰 تأكيد دفع (CAPI)", callback_data: `payment_${chatId}` }
+                    ],
+                    [
+                        { text: "✅ نعم، Business متوفر", callback_data: `bizyes_${chatId}` }
                     ]
                 ]
             }
@@ -70,17 +73,30 @@ async function startTelegramPolling(onAction) {
                     const waChatId = data.split('_')[1];
                     const action = data.split('_')[0];
 
-                    // تنفيذ الأكشن (resume أو payment)
+                    // تنفيذ الأكشن (resume أو payment أو bizyes)
                     onAction({ action, waChatId });
 
                     // تأكيد النقر في تلغرام
+                    let responseText = "";
+                    let statusText = "";
+
+                    if (action === 'resume') {
+                        responseText = "✅ تم إعادة تفعيل البوت!";
+                        statusText = "✅ تم التفعيل بنجاح";
+                    } else if (action === 'payment') {
+                        responseText = "✅ تم إرسال حدث الشراء لفيسبوك!";
+                        statusText = "💰 تم تأكيد الدفع وإرسال CAPI";
+                    } else if (action === 'bizyes') {
+                        responseText = "✅ تم تأكيد توفر الحساب وإرسال العرض!";
+                        statusText = "⚡ تم إخطار الزبون بتوفر الحساب (عرض التجربة)";
+                    }
+
                     await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
                         callback_query_id: update.callback_query.id,
-                        text: action === 'resume' ? "✅ تم إعادة تفعيل البوت!" : "✅ تم إرسال حدث الشراء لفيسبوك!"
+                        text: responseText
                     });
 
                     // تحديث الرسالة لتوضيح أنها اكتملت
-                    const statusText = action === 'resume' ? "✅ تم التفعيل بنجاح" : "💰 تم تأكيد الدفع وإرسال CAPI";
                     await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
                         chat_id: TELEGRAM_CHAT_ID,
                         message_id: update.callback_query.message.message_id,

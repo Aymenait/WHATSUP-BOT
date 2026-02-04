@@ -13,17 +13,17 @@ export const PRODUCTS_DATA = {
             ]
         },
         {
-            name: "ChatGPT Plus & Business",
+            name: "ChatGPT 5.2 (Plus & Business)",
             category: "AI Chat & Assistant",
-            keywords: ["gpt-4", "gpt4", "o1", "openai", "writing", "analysis", "ai assistance", "business", "workspace"],
+            keywords: ["gpt-5.2", "openai", "writing", "analysis", "ai assistance", "business", "workspace", "plus"],
             delivery_type: "email_invite",
-            price_dzd: 1200,
-            price_usd: 6,
-            description: "اشتراك ChatGPT Plus أو ChatGPT Business. كلا الخيارين يوفران وصولاً كاملاً لأقوى وأحدث نماذج الذكاء الاصطناعي (o1, GPT-4o, DALL-E). الفرق الأساسي هو في طريقة التفعيل وبيئة العمل.",
+            price_dzd: 1000,
+            price_usd: 5,
+            description: "اشتراك ChatGPT 5.2 بأحدث النماذج. اختر بين تفعيل Business الاحترافي على إيميلك الشخصي أو حساب Plus خاص غير محدود.",
             durations: [
-                { key: "plus", price_dzd: 1000, price_usd: 4, description: "ChatGPT Plus - نعطيك حساب جاهز (إيميل وباسورد). تفعيل فوري ووصول كامل لكل الميزات." },
-                { key: "business", price_dzd: 1200, price_usd: 6, description: "ChatGPT Business (Workspace) - تفعيل رسمي على إيميلك الشخصي. ميزة (التجربة أولاً ثم الدفع). وصول غير محدود لنموذج Instant، ومحدود بـ 15 طلب شهرياً لنموذج الـ Pro. خصوصية تامة." },
-                { key: "reseller", price_dzd: 2000, price_usd: 10, description: "عرض الجملة: حساب (إيميل + باسورد) بميزات Business، يمكنك إضافة 5 أشخاص معك (1+5). التفعيل خلال 5-30 دقيقة." }
+                { key: "business", price_dzd: 1000, price_usd: 5, description: "ChatGPT 5.2 Business (1000 DA) - تفعيل رسمي على إيميلك الشخصي. يحتوي على ميزات 'Pro' الكاملة. تنبيه: الـ Workspace يغلق بعد شهر ولا يمكن رؤية السجل (History)." },
+                { key: "plus", price_dzd: 1200, price_usd: 6, description: "ChatGPT 5.2 Plus (1200 DA) - حساب خاص جديد (إيميل وباسورد). استخدام غير محدود، والحساب يبقى مفتوحاً كـ Free Plan بعد شهر (السجل History يبقى محفوظاً)." },
+                { key: "reseller", price_dzd: 2000, price_usd: 10, description: "عرض الجملة: حساب (إيميل + باسورد) بميزات Business (ChatGPT 5.2)، يمكنك إضافة 5 أشخاص معك (1+5)." }
             ]
         },
         {

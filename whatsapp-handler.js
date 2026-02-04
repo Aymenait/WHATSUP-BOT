@@ -97,6 +97,19 @@ async function startBot() {
     startTelegramPolling(async ({ action, waChatId }) => {
         if (action === 'resume') {
             resumeChat(waChatId);
+        } else if (action === 'bizyes') {
+            console.log(`✅ Admin confirmed Business availability for ${waChatId}`);
+            try {
+                const trialMsg = "نعم خويا، حساب Business متوفر حالياً. وباش تطمئن أكثر، تقدر تفعله وتجربه الأول على إيميلك الشخصي، ومن بعد إذا عجبك الحال خلصنا. واش رايك؟";
+                const sentTrial = await sock.sendMessage(waChatId, { text: trialMsg });
+                if (sentTrial && sentTrial.key) {
+                    botMessageIds.add(sentTrial.key.id);
+                }
+                // Also auto-resume the bot if it was paused
+                resumeChat(waChatId);
+            } catch (err) {
+                console.error('❌ Error sending Business trial message:', err.message);
+            }
         } else if (action === 'stop_bot') {
             isBotStoppedGlobal = true;
             sendNotification("🛑 <b>تم إيقاف البوت بالكامل!</b> لن يرد على أي رسالة حتى تقوم بتفعيله.");
@@ -263,17 +276,30 @@ async function startBot() {
             let imageBase64 = null;
             let audioBase64 = null;
 
+            // دالة مساعدة للتحميل مع المحاولة مرة أخرى
+            const downloadWithRetry = async (message, type, retries = 3) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        return await downloadMediaMessage(message, type);
+                    } catch (err) {
+                        if (i === retries - 1) throw err;
+                        console.log(`⚠️ Media download failed (Attempt ${i + 1}/${retries}), retrying...`);
+                        await new Promise(res => setTimeout(res, 1500));
+                    }
+                }
+            };
+
             // إذا كانت الرسالة صورة
             if (isImage) {
                 console.log('🖼️ User sent an image, downloading...');
-                const buffer = await downloadMediaMessage(msg, 'buffer');
+                const buffer = await downloadWithRetry(msg, 'buffer');
                 imageBase64 = buffer.toString('base64');
             }
 
             // إذا كانت الرسالة تسجيل صوتي
             if (isAudio) {
                 console.log('🎙️ User sent a voice note, downloading...');
-                const buffer = await downloadMediaMessage(msg, 'buffer');
+                const buffer = await downloadWithRetry(msg, 'buffer');
                 audioBase64 = buffer.toString('base64');
             }
 
@@ -281,7 +307,7 @@ async function startBot() {
             let aiResponse = await generateResponse(text, context, history, imageBase64, audioBase64);
 
             // تنظيف الرد من الكلمات البرمجية قبل إرساله للزبون
-            let cleanResponse = aiResponse.replace(/REGISTER_ORDER/g, '').replace(/CONTACT_ADMIN/g, '').replace(/STOP_BOT/g, '').replace(/RECEIPT_DETECTED_TAG/g, '').trim();
+            let cleanResponse = aiResponse.replace(/REGISTER_ORDER/g, '').replace(/CONTACT_ADMIN/g, '').replace(/STOP_BOT/g, '').replace(/RECEIPT_DETECTED_TAG/g, '').replace(/BUSINESS_AVAILABILITY_QUERY/g, '').trim();
 
             // 📢 إشعارات ذكية تعتمد على تاغات الـ AI
             const shouldNotifyAdmin = aiResponse.includes('CONTACT_ADMIN');
@@ -340,6 +366,20 @@ async function startBot() {
                     pausedChats.add(normalizedId);
                     pausedChats.add(chatId);
                 }
+            }
+
+            // 🚨 كشف السؤال عن توفر Business
+            if (aiResponse.includes('BUSINESS_AVAILABILITY_QUERY')) {
+                console.log(`🔍 Business Availability Query Detected. Notifying Admin...`);
+                await sendNotificationWithButton(`🔍 <b>استفسار عن توفر Business</b>
+👤 الإسم: ${pushName}
+📱 الهاتف: ${normalizedId}
+💬 الزبون يسأل إذا كان حساب Business متوفر حالياً.
+✅ إذا ضغطت "نعم"، سيرسل له البوت عرض "التجربة أولاً".`, chatId);
+
+                // نقوم بإيقاف البوت مؤقتاً حتى يقرر الأدمن
+                pausedChats.add(normalizedId);
+                pausedChats.add(chatId);
             }
 
             // ميزة إرسال صورة الـ CCP: ترسل فقط إذا طلب الزبون الـ CCP صراحة
