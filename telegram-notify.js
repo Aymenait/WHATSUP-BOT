@@ -38,7 +38,7 @@ async function sendNotificationWithButton(message, chatId) {
                 inline_keyboard: [
                     [
                         { text: "🤖 تفعيل البوت", callback_data: `resume_${chatId}` },
-                        { text: "💰 تأكيد دفع (CAPI)", callback_data: `payment_${chatId}` }
+                        { text: "💰 تأكيد دفع (CAPI + Sheets)", callback_data: `payment_${chatId}` }
                     ],
                     [
                         { text: "✅ نعم، Business متوفر", callback_data: `bizyes_${chatId}` }
@@ -73,7 +73,7 @@ async function startTelegramPolling(onAction) {
                     const waChatId = data.split('_')[1];
                     const action = data.split('_')[0];
 
-                    // تنفيذ الأكشن (resume أو payment أو bizyes)
+                    // تنفيذ الأكشن (resume أو payment أو bizyes أو sheet)
                     onAction({ action, waChatId });
 
                     // تأكيد النقر في تلغرام
@@ -89,6 +89,9 @@ async function startTelegramPolling(onAction) {
                     } else if (action === 'bizyes') {
                         responseText = "✅ تم تأكيد توفر الحساب وإرسال العرض!";
                         statusText = "⚡ تم إخطار الزبون بتوفر الحساب (عرض التجربة)";
+                    } else if (action === 'sheet') {
+                        responseText = "📊 تم تسجيل البيعة في Google Sheets!";
+                        statusText = "📊 تم الحفظ في Google Sheets بنجاح";
                     }
 
                     await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {

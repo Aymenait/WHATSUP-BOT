@@ -10,12 +10,21 @@ import { fetchCurrentProducts, formatProductsForAI } from './products-fetcher.js
 import { notifyNewLead, sendNotification, sendNotificationWithButton, startTelegramPolling } from './telegram-notify.js';
 import { sendMetaEvent } from './meta-capi.js';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
+import mongoose from 'mongoose';
+import History from './models/History.js';
+import { saveSaleToSheet } from './sheets-logger.js';
+
+// 🗄️ الاتصال بقاعدة البيانات
+mongoose.connect(process.env.MONGODB_URI)
+    .then(() => console.log('✅ Connected to MongoDB Atlas'))
+    .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
 const chatHistory = new Map();
 const pausedChats = new Set();
 const botMessageIds = new Set();
 const autoResumeTimers = new Map();
 const contactNames = new Map(); // خارطة لحفظ أسماء الزبائن
+const pendingSales = new Map(); // حفظ بيانات المبيعات بانتظار التأكيد من تلغرام
 let isBotStoppedGlobal = false; // متغير للتحكم في تشغيل البوت بالكامل
 
 const AUTO_RESUME_DELAY = 2 * 60 * 60 * 1000; // 2 hours
@@ -122,15 +131,22 @@ async function startBot() {
         } else if (action === 'payment') {
             console.log(`💰 Manual Payment Confirmation for ${waChatId}`);
 
-            // 1. Send Meta CAPI Event (Purchase)
-            // Note: We use default values but in a real scenario we'd track the last intent
+            // 1. تسجيل البيعة في Google Sheets (إذا وجدت بيانات معلقة)
+            const saleData = pendingSales.get(waChatId);
+            if (saleData) {
+                await saveSaleToSheet(saleData);
+                pendingSales.delete(waChatId);
+                console.log(`✅ Sale recorded in Sheets for ${waChatId}`);
+            }
+
+            // 2. Send Meta CAPI Event (Purchase)
             await sendMetaEvent('Purchase', { phone: waChatId.split('@')[0] }, {
-                value: 1500, // Default value, can be improved to be dynamic
+                value: saleData?.price ? parseInt(saleData.price) : 1200,
                 currency: 'DZD',
-                contentName: 'Service Order'
+                contentName: saleData?.product || 'Service Order'
             });
 
-            // 2. Automated WhatsApp Reply to Customer
+            // 3. Automated WhatsApp Reply to Customer
             try {
                 const successMsg = "🎉 *تم تأكيد دفعك بنجاح!*\n\nشكراً لثقتك بنا. جاري الآن تفعيل اشتراكك وسنرسل لك البيانات في غضون لحظات. استعد للمتعة! 🚀";
                 const sentSuccess = await sock.sendMessage(waChatId, { text: successMsg });
@@ -144,42 +160,82 @@ async function startBot() {
     });
 
     sock.ev.on('messages.upsert', async (m) => {
+        if (m.type !== 'notify') return; // تجاهل رسائل المزامنة التاريخية
+
         const msg = m.messages[0];
         if (!msg.message || msg.key.remoteJid === 'status@broadcast') return;
 
-        // فحص إذا كان البوت موقوفاً بطلب عام
-        if (isBotStoppedGlobal && !msg.key.fromMe) return;
+        // 🛡️ حماية: تجاهل الرسائل القديمة (أكثر من دقيقتين) لكي لا يزعج الزبائن بردود متأخرة
+        const messageTimestamp = msg.messageTimestamp;
+        const now = Math.floor(Date.now() / 1000);
+        if (now - messageTimestamp > 120) {
+            console.log(`⏳ Ignoring old message from ${msg.pushName || msg.key.remoteJid}`);
+            return;
+        }
 
         const chatId = msg.key.remoteJid;
-        // استخراج الأرقام فقط (حل نهائي لمشكلة الأيفون والـ LID/JID)
         const normalizedId = chatId.replace(/\D/g, '');
         const pushName = msg.pushName || 'User';
         const messageId = msg.key.id;
 
-        // دالة لاستخراج النص من مختلف أنواع الرسائل (بما فيها الرسائل المختفية)
+        // دالة لاستخراج النص من مختلف أنواع الرسائل
         const getMessageText = (m) => {
             const message = m.message;
             if (!message) return '';
-
-            // التعامل مع الرسائل المختفية أو التي تشاهد مرة واحدة
             const content = message.ephemeralMessage?.message || message.viewOnceMessage?.message || message.viewOnceMessageV2?.message || message;
-
             return content.conversation ||
                 content.extendedTextMessage?.text ||
                 content.imageMessage?.caption ||
-                content.videoMessage?.caption || '';
-        };
-
-        const detectLanguage = (txt) => {
-            if (/[àâäéèêëïîôùûüç]/i.test(txt)) return 'fr';
-            if (/^[a-zA-Z0-9\s.,!?']+$/.test(txt.trim())) return 'en';
-            return 'ar';
+                content.videoMessage?.caption ||
+                (content.imageMessage ? '(صورة)' : '') ||
+                (content.audioMessage ? '(رسالة صوتية)' : '') ||
+                (content.videoMessage ? '(فيديو)' : '') || '';
         };
 
         const text = getMessageText(msg);
         const messageText = text.trim().toLowerCase();
 
         if (chatId.includes('@g.us')) return;
+
+        // تحديث التاريخ في قاعدة البيانات لأي رسالة (دائماً وأبداً لضمان السياق)
+        const updateHistoryPassively = async (role, content) => {
+            try {
+                let currentHistory = chatHistory.get(chatId);
+                if (!currentHistory) {
+                    const dbH = await History.findOne({ chatId });
+                    currentHistory = dbH ? dbH.messages : [];
+                }
+                currentHistory.push({ role, text: content });
+                if (currentHistory.length > 40) currentHistory.shift();
+                chatHistory.set(chatId, currentHistory);
+                await History.findOneAndUpdate({ chatId }, { messages: currentHistory, lastUpdate: new Date() }, { upsert: true });
+            } catch (e) { console.error('Error in passive sync:', e.message); }
+        };
+
+        // تسجيل الرسالة فوراً قبل التحقق من حالة التوقف
+        if (msg.key.fromMe) {
+            // نسجل رسائل الأدمن فقط إذا لم تكن من البوت نفسه (لتفادي التكرار)
+            if (!botMessageIds.has(messageId)) {
+                await updateHistoryPassively('assistant', text || (msg.message.imageMessage ? '(صورة)' : '(وسائط)'));
+            }
+        } else {
+            // نسجل رسائل الزبون دائماً في الخلفية
+            await updateHistoryPassively('user', text || (msg.message.imageMessage ? '(صورة)' : '(وسائط)'));
+        }
+
+        // الآن نفحص إذا كان البوت موقوفاً لكي لا يرد (لكن الذاكرة تم تحديثها أعلاه)
+        if (isBotStoppedGlobal && !msg.key.fromMe) return;
+        if (pausedChats.has(normalizedId) || pausedChats.has(chatId)) return;
+        // استخراج المعلومات الأساسية للرسالة
+        const isImage = !!msg.message?.imageMessage || !!msg.message?.viewOnceMessage?.message?.imageMessage || !!msg.message?.viewOnceMessageV2?.message?.imageMessage;
+        const isAudio = !!msg.message?.audioMessage || !!msg.message?.viewOnceMessage?.message?.audioMessage || !!msg.message?.viewOnceMessageV2?.message?.audioMessage;
+        const isVideo = !!msg.message?.videoMessage || !!msg.message?.viewOnceMessage?.message?.videoMessage || !!msg.message?.viewOnceMessageV2?.message?.videoMessage;
+
+        const detectLanguage = (txt) => {
+            if (/[àâäéèêëïîôùûüç]/i.test(txt)) return 'fr';
+            if (/^[a-zA-Z0-9\s.,!?']+$/.test(txt.trim())) return 'en';
+            return 'ar';
+        };
 
         // حفظ اسم الزبون الحقيقي (باستخدام الرقم الصافي)
         if (!msg.key.fromMe && msg.pushName) {
@@ -188,9 +244,22 @@ async function startBot() {
 
         const customerName = contactNames.get(normalizedId) || normalizedId;
 
-        // Detect Message Types
-        const isAudio = msg.message.audioMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.audioMessage;
-        const isImage = msg.message.imageMessage || msg.message.extendedTextMessage?.contextInfo?.quotedMessage?.imageMessage;
+        // 🗑️ أمر تصفير الذاكرة (Reset Memory)
+        if (messageText === '!clean' || messageText === '!reset' || messageText === 'تصفير' || messageText === 'مسح الذاكرة') {
+            console.log(`🗑️ Memory cleared for ${customerName}`);
+            chatHistory.delete(chatId);
+            try {
+                await History.deleteOne({ chatId });
+                if (!msg.key.fromMe) {
+                    await sock.sendMessage(chatId, { text: '✅ تم مسح ذاكرة المحادثة بنجاح. سأعاملك الآن كزبون جديد عند أول رسالة قادمة!' });
+                }
+            } catch (err) {
+                console.error('❌ Error clearing memory:', err.message);
+            }
+            return;
+        }
+
+        // Detect Message Types (Already handled above)
 
         if (msg.key.fromMe) {
             if (botMessageIds.has(messageId)) {
@@ -272,6 +341,23 @@ async function startBot() {
             const data = await fetchCurrentProducts();
             const context = data ? formatProductsForAI(data) : "منتجاتنا متوفرة.";
 
+            // 🔄 تحميل السجل من قاعدة البيانات (MongoDB)
+            if (!chatHistory.has(chatId)) {
+                console.log(`📡 Loading history for ${pushName} from DB...`);
+                try {
+                    const dbHistory = await History.findOne({ chatId });
+                    chatHistory.set(chatId, dbHistory ? dbHistory.messages : []);
+                    if (dbHistory) {
+                        console.log(`✅ Loaded ${dbHistory.messages.length} messages from DB for ${pushName}`);
+                    } else {
+                        console.log(`🆕 New user: ${pushName}`);
+                    }
+                } catch (err) {
+                    console.error('❌ Error loading history from DB:', err.message);
+                    chatHistory.set(chatId, []);
+                }
+            }
+
             const history = chatHistory.get(chatId) || [];
             let imageBase64 = null;
             let audioBase64 = null;
@@ -307,7 +393,28 @@ async function startBot() {
             let aiResponse = await generateResponse(text, context, history, imageBase64, audioBase64);
 
             // تنظيف الرد من الكلمات البرمجية قبل إرساله للزبون
-            let cleanResponse = aiResponse.replace(/REGISTER_ORDER/g, '').replace(/CONTACT_ADMIN/g, '').replace(/STOP_BOT/g, '').replace(/RECEIPT_DETECTED_TAG/g, '').replace(/BUSINESS_AVAILABILITY_QUERY/g, '').trim();
+            let audioSummary = "";
+            let imageSummary = "";
+
+            if (aiResponse.includes('AUDIO_SUMMARY:')) {
+                audioSummary = aiResponse.split('AUDIO_SUMMARY:')[1].split('\n')[0].trim();
+            }
+            if (aiResponse.includes('IMAGE_SUMMARY:')) {
+                imageSummary = aiResponse.split('IMAGE_SUMMARY:')[1].split('\n')[0].trim();
+            }
+
+            let cleanResponse = aiResponse
+                .replace(/AUDIO_SUMMARY:[\s\S]*?\n\n/g, '')
+                .replace(/AUDIO_SUMMARY:.*?\n/g, '')
+                .replace(/IMAGE_SUMMARY:[\s\S]*?\n\n/g, '')
+                .replace(/IMAGE_SUMMARY:.*?\n/g, '')
+                .replace(/SAVE_SALE_TAG:[\s\S]*?(\n|$)/g, '')
+                .replace(/REGISTER_ORDER/g, '')
+                .replace(/CONTACT_ADMIN/g, '')
+                .replace(/STOP_BOT/g, '')
+                .replace(/RECEIPT_DETECTED_TAG/g, '')
+                .replace(/BUSINESS_AVAILABILITY_QUERY/g, '')
+                .trim();
 
             // 📢 إشعارات ذكية تعتمد على تاغات الـ AI
             const shouldNotifyAdmin = aiResponse.includes('CONTACT_ADMIN');
@@ -399,10 +506,20 @@ async function startBot() {
                 }
             }
 
-            history.push({ role: 'user', text: text });
+            // 💾 تحديث السجل في الذاكرة وقاعدة البيانات
+            const userHistoryText = text || (isAudio ? (audioSummary ? `🎙️ (فوكال): ${audioSummary}` : '(صوت)') : isImage ? (imageSummary ? `🖼️ (صورة): ${imageSummary}` : '(صورة)') : '...');
+
+            history.push({ role: 'user', text: userHistoryText });
             history.push({ role: 'assistant', text: cleanResponse });
-            if (history.length > 20) history.shift();
+
+            if (history.length > 40) history.shift();
             chatHistory.set(chatId, history);
+
+            await History.findOneAndUpdate(
+                { chatId },
+                { messages: history, lastUpdate: new Date() },
+                { upsert: true }
+            ).catch(err => console.error('❌ Error saving to DB:', err));
 
             if (aiResponse.includes('REGISTER_ORDER')) {
                 console.log(`💰 Order Confirmation Detected. Notifying Admin...`);
@@ -413,6 +530,26 @@ async function startBot() {
             if (aiResponse.includes('RECEIPT_DETECTED_TAG')) {
                 console.log(`🖼️ Confirmed Receipt Detected by AI. Notifying Admin...`);
                 await sendNotificationWithButton(`🖼️ *وصل دفع حقيقي (تم تأكيده بالذكاء الاصطناعي)*\n👤 الإسم: ${pushName}\n📱 رابط المحادثة: https://wa.me/${chatId.split('@')[0]}`, chatId);
+            }
+
+            // 📊 تسجيل البيعة في Google Sheets (انتظار تأكيد الأدمن من تلغرام)
+            if (aiResponse.includes('SAVE_SALE_TAG:')) {
+                try {
+                    const tagPart = aiResponse.split('SAVE_SALE_TAG:')[1].trim();
+                    const jsonMatch = tagPart.match(/\{.*?\}/);
+                    if (jsonMatch) {
+                        const saleData = JSON.parse(jsonMatch[0]);
+                        // حفظ البيانات بانتظار ضغط الزر في تلغرام
+                        pendingSales.set(chatId, {
+                            ...saleData,
+                            customerName: pushName,
+                            phoneNumber: normalizedId
+                        });
+                        console.log(`⏳ Sale pending confirmation for ${pushName}`);
+                    }
+                } catch (sheetErr) {
+                    console.error('❌ Failed to parse pending sale tag:', sheetErr.message);
+                }
             }
 
 
