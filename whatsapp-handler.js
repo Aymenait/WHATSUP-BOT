@@ -70,8 +70,21 @@ const handleAutoDelivery = async (productName, chatId, normalizedId, sock) => {
             if (availableIndex !== -1) {
                 const item = inventory[productKey][availableIndex];
 
+                // تنسيق البيانات بشكل واضح (إيميل وباسورد منفصلين)
+                let accountDetails = item.account;
+                if (item.account.includes(':')) {
+                    const [email, ...rest] = item.account.split(':');
+                    const pass = rest.join(':');
+                    accountDetails = `📧 الإيميل: \`${email}\` \n🔑 كلمة السر: \`${pass}\``;
+                } else {
+                    accountDetails = `🎫 البيانات: \`${item.account}\``;
+                }
+
                 // إرسال البيانات للزبون
-                const deliveryMsg = `🚀 *تسليم آلي ناجح!*\n\nتفضل حسابك الخاص بـ *${productKey}*:\n\n📧 الحساب: \`${item.account}\` \n\n⚠️ يرجى تغيير كلمة السر لضمان خصوصيتك. استمتع بدورتك! ✨`;
+                const isTRW = productKey.toLowerCase().includes('the real world') || productKey.toLowerCase().includes('trw');
+                const warningMsg = isTRW ? "⚠️ يرجى عدم تغيير البيانات لضمان استمرارية الحساب لجميع المشتركين." : "⚠️ يرجى تغيير كلمة السر لضمان خصوصيتك.";
+
+                const deliveryMsg = `🚀 *تسليم آلي ناجح!* \n\nتفضل حسابك الخاص بـ *${productKey}*:\n\n${accountDetails} \n\n${warningMsg} استمتع بدورتك! ✨`;
                 await sock.sendMessage(chatId, { text: deliveryMsg });
 
                 // تحديث المخزون (فقط إذا لم يكن حساباً مشتركاً غير محدود)
@@ -575,6 +588,7 @@ async function startBot() {
                 .replace(/BUSINESS_AVAILABILITY_QUERY/g, '')
                 .replace(/CREATE_SUPPORT_TICKET/g, '')
                 .replace(/SEND_IMAGE:[\s\S]*?(\n|$)/g, '')
+                .replace(/FETCH_CURRENT_DATA:[\s\S]*?(\n|$)/g, '')
                 .trim();
 
             // 📢 إشعارات ذكية تعتمد على تاغات الـ AI
@@ -668,6 +682,38 @@ async function startBot() {
                     }
                 } catch (e) {
                     console.error('❌ Error sending smart image:', e.message);
+                }
+            }
+
+            // 🔐 جلب البيانات الحالية (Shared Accounts) وإرسالها للزبون
+            if (aiResponse.includes('FETCH_CURRENT_DATA:')) {
+                try {
+                    const productToFetch = aiResponse.split('FETCH_CURRENT_DATA:')[1].split('\n')[0].trim();
+                    const inventoryPath = './inventory.json';
+                    if (fs.existsSync(inventoryPath)) {
+                        const inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+                        // البحث عن المنتج في المخزون (توافق مع الأسماء مثل "The Real World Account")
+                        const key = Object.keys(inventory).find(k => k.toLowerCase().includes(productToFetch.toLowerCase()));
+
+                        if (key && inventory[key] && inventory[key].length > 0) {
+                            const acc = inventory[key][0].account;
+                            console.log(`🔐 Automatically sending updated data for ${productToFetch} to ${pushName}`);
+
+                            // تنسيق البيانات بشكل واضح
+                            let accountDetails = acc;
+                            if (acc.includes(':')) {
+                                const [email, ...rest] = acc.split(':');
+                                const pass = rest.join(':');
+                                accountDetails = `📧 الإيميل: \`${email}\` \n🔑 كلمة السر: \`${pass}\``;
+                            }
+
+                            // إرسال البيانات فوراً
+                            const detailsMsg = `✅ *إليك بيانات الحساب المحدثة:* \n\n${accountDetails}\n\n⚠️ يرجى عدم تغيير البيانات لضمان استمرارية الحساب لجميع المشتركين.`;
+                            await sock.sendMessage(chatId, { text: detailsMsg });
+                        }
+                    }
+                } catch (e) {
+                    console.error('❌ Error in FETCH_CURRENT_DATA logic:', e.message);
                 }
             }
 
