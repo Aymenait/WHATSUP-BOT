@@ -56,6 +56,44 @@ function resumeChat(chatId) {
     }
 }
 
+// 🚚 دالة التسليم الآلي للمنتجات
+const handleAutoDelivery = async (productName, chatId, normalizedId, sock) => {
+    try {
+        const inventoryPath = './inventory.json';
+        if (!fs.existsSync(inventoryPath)) return false;
+
+        const inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+        const productKey = Object.keys(inventory).find(k => k.toLowerCase().includes(productName.toLowerCase()) || productName.toLowerCase().includes(k.toLowerCase()));
+
+        if (productKey && inventory[productKey] && inventory[productKey].length > 0) {
+            const availableIndex = inventory[productKey].findIndex(item => item.status === 'available');
+            if (availableIndex !== -1) {
+                const item = inventory[productKey][availableIndex];
+
+                // إرسال البيانات للزبون
+                const deliveryMsg = `🚀 *تسليم آلي ناجح!*\n\nتفضل حسابك الخاص بـ *${productKey}*:\n\n📧 الحساب: \`${item.account}\` \n\n⚠️ يرجى تغيير كلمة السر لضمان خصوصيتك. استمتع بدورتك! ✨`;
+                await sock.sendMessage(chatId, { text: deliveryMsg });
+
+                // تحديث المخزون (فقط إذا لم يكن حساباً مشتركاً غير محدود)
+                if (!item.unlimited) {
+                    inventory[productKey][availableIndex].status = 'used';
+                    inventory[productKey][availableIndex].usedAt = new Date().toISOString();
+                    inventory[productKey][availableIndex].usedBy = normalizedId;
+                    fs.writeFileSync(inventoryPath, JSON.stringify(inventory, null, 2));
+                }
+
+                // إخطار الأدمن
+                await sendNotification(`🚚 <b>تسليم آلي ناجح!</b>\n👤 الزبون: ${normalizedId}\n📦 المنتج: ${productKey}${item.unlimited ? ' (حساب مشترك)' : ''}\n🎫 البيانات المرسلة: <code>${item.account}</code>`);
+                return true;
+            }
+        }
+        return false;
+    } catch (e) {
+        console.error('❌ Error in auto-delivery:', e.message);
+        return false;
+    }
+};
+
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
@@ -107,17 +145,45 @@ async function startBot() {
         if (action === 'resume') {
             resumeChat(waChatId);
         } else if (action === 'bizyes') {
-            console.log(`✅ Admin confirmed Business availability for ${waChatId}`);
+            const normalizedId = waChatId.replace(/\D/g, '');
+            console.log(`✅ Admin confirmed Business availability for ${normalizedId}. Generating smart reply...`);
             try {
-                const trialMsg = "نعم خويا، حساب Business متوفر حالياً. وباش تطمئن أكثر، تقدر تفعله وتجربه الأول على إيميلك الشخصي، ومن بعد إذا عجبك الحال خلصنا. واش رايك؟";
-                const sentTrial = await sock.sendMessage(waChatId, { text: trialMsg });
+                // جلب الذاكرة
+                let history = chatHistory.get(normalizedId) || [];
+                if (history.length === 0) {
+                    const dbHistory = await History.findOne({ chatId: normalizedId });
+                    if (dbHistory) history = dbHistory.messages;
+                }
+
+                const data = await fetchCurrentProducts();
+                const context = data ? formatProductsForAI(data) : "منتجاتنا متوفرة.";
+
+                // إعطاء تعليمات خاصة للذكاء الاصطناعي لصياغة الرد
+                const prompt = "الأدمن أكد أن حساب Business متوفر حالياً. رد على الزبون بأسلوبك الذكي والودود، أخبره بالخبر السعيد وذكره بعرض 'التجربة أولاً' (يفعله في إيميله قبل الدفع) لإقناعه وإتمام العملية.";
+
+                let aiResponse = await generateResponse(prompt, context, history);
+
+                let cleanResponse = aiResponse
+                    .replace(/REGISTER_ORDER/g, '')
+                    .replace(/CONTACT_ADMIN/g, '')
+                    .replace(/STOP_BOT/g, '')
+                    .replace(/BUSINESS_AVAILABILITY_QUERY/g, '')
+                    .trim();
+
+                const sentTrial = await sock.sendMessage(waChatId, { text: cleanResponse });
                 if (sentTrial && sentTrial.key) {
                     botMessageIds.add(sentTrial.key.id);
                 }
-                // Also auto-resume the bot if it was paused
+
+                // تحديث الذاكرة
+                history.push({ role: 'assistant', text: cleanResponse });
+                chatHistory.set(normalizedId, history);
+                await History.findOneAndUpdate({ chatId: normalizedId }, { messages: history, lastUpdate: new Date() }, { upsert: true });
+
+                // تفعيل البوت
                 resumeChat(waChatId);
             } catch (err) {
-                console.error('❌ Error sending Business trial message:', err.message);
+                console.error('❌ Error sending Smart Business confirmation:', err.message);
             }
         } else if (action === 'stop_bot') {
             isBotStoppedGlobal = true;
@@ -127,26 +193,20 @@ async function startBot() {
             sendNotification("🚀 <b>تم تفعيل البوت بالكامل!</b> عاد للعمل والرد على الجميع.");
         } else if (action === 'restart_bot') {
             await sendNotification("🔄 <b>جاري إعادة تشغيل البوت...</b> انتظر 10 ثواني.");
-            process.exit(1); // كوييب سيعيد تشغيله تلقائياً
+            process.exit(1);
         } else if (action === 'payment') {
             console.log(`💰 Manual Payment Confirmation for ${waChatId}`);
-
-            // 1. تسجيل البيعة في Google Sheets (إذا وجدت بيانات معلقة)
             const saleData = pendingSales.get(waChatId);
             if (saleData) {
                 await saveSaleToSheet(saleData);
                 pendingSales.delete(waChatId);
                 console.log(`✅ Sale recorded in Sheets for ${waChatId}`);
             }
-
-            // 2. Send Meta CAPI Event (Purchase)
             await sendMetaEvent('Purchase', { phone: waChatId.split('@')[0] }, {
                 value: saleData?.price ? parseInt(saleData.price) : 1200,
                 currency: 'DZD',
                 contentName: saleData?.product || 'Service Order'
             });
-
-            // 3. Automated WhatsApp Reply to Customer
             try {
                 const successMsg = "🎉 *تم تأكيد دفعك بنجاح!*\n\nشكراً لثقتك بنا. جاري الآن تفعيل اشتراكك وسنرسل لك البيانات في غضون لحظات. استعد للمتعة! 🚀";
                 const sentSuccess = await sock.sendMessage(waChatId, { text: successMsg });
@@ -155,6 +215,57 @@ async function startBot() {
                 }
             } catch (err) {
                 console.error('❌ Error sending WhatsApp confirmation:', err.message);
+            }
+        } else if (action === 'set_trw') {
+            const data = waChatId; // في حالة الأوامر النصية، waChatId يحمل الرسالة
+            console.log(`🔐 Updating TRW Account from Telegram...`);
+            try {
+                const inventoryPath = './inventory.json';
+                let inventory = { "The Real World Account": [] };
+                if (fs.existsSync(inventoryPath)) {
+                    inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+                }
+                // تحديث أول حساب موجود أو إضافة واحد جديد
+                if (inventory["The Real World Account"] && inventory["The Real World Account"].length > 0) {
+                    const currentAccount = inventory["The Real World Account"][0].account;
+                    let finalData = data;
+
+                    // إذا كان المستخدم أرسل الباسوورد فقط (بدون :) وكان الحساب الحالي يحتوي على إيميل (فيه :)
+                    if (!data.includes(':') && currentAccount.includes(':')) {
+                        const email = currentAccount.split(':')[0];
+                        finalData = `${email}:${data}`;
+                    }
+
+                    inventory["The Real World Account"][0].account = finalData;
+                    inventory["The Real World Account"][0].status = "available";
+                    inventory["The Real World Account"][0].unlimited = true;
+
+                    fs.writeFileSync(inventoryPath, JSON.stringify(inventory, null, 2));
+                    await sendNotification(`✅ <b>تم تحديث حساب TRW بنجاح!</b>\n🎫 البيانات الجديدة: <code>${finalData}</code>`);
+                } else {
+                    inventory["The Real World Account"] = [{ account: data, status: "available", unlimited: true }];
+                    fs.writeFileSync(inventoryPath, JSON.stringify(inventory, null, 2));
+                    await sendNotification(`✅ <b>تم إضافة حساب TRW جديد!</b>\n🎫 البيانات: <code>${data}</code>`);
+                }
+            } catch (e) {
+                console.error('❌ Failed to update TRW account:', e.message);
+                await sendNotification(`❌ <b>فشل تحديث الحساب:</b> ${e.message}`);
+            }
+        } else if (action === 'show_inventory') {
+            try {
+                const inventoryPath = './inventory.json';
+                const inventory = fs.existsSync(inventoryPath) ? JSON.parse(fs.readFileSync(inventoryPath, 'utf8')) : {};
+                let invText = "📦 <b>المخزون الحالي:</b>\n\n";
+                for (const [prod, items] of Object.entries(inventory)) {
+                    invText += `<b>${prod}:</b>\n`;
+                    items.forEach((item, i) => {
+                        invText += `${i + 1}. ${item.account} (${item.status})${item.unlimited ? ' [♾️]' : ''}\n`;
+                    });
+                    invText += "\n";
+                }
+                await sendNotification(invText || "📂 المخزون فارغ حالياً.");
+            } catch (e) {
+                await sendNotification(`❌ خطأ في قراءة المخزون: ${e.message}`);
             }
         }
     });
@@ -200,15 +311,15 @@ async function startBot() {
         // تحديث التاريخ في قاعدة البيانات لأي رسالة (دائماً وأبداً لضمان السياق)
         const updateHistoryPassively = async (role, content) => {
             try {
-                let currentHistory = chatHistory.get(chatId);
+                let currentHistory = chatHistory.get(normalizedId);
                 if (!currentHistory) {
-                    const dbH = await History.findOne({ chatId });
+                    const dbH = await History.findOne({ chatId: normalizedId });
                     currentHistory = dbH ? dbH.messages : [];
                 }
                 currentHistory.push({ role, text: content });
                 if (currentHistory.length > 40) currentHistory.shift();
-                chatHistory.set(chatId, currentHistory);
-                await History.findOneAndUpdate({ chatId }, { messages: currentHistory, lastUpdate: new Date() }, { upsert: true });
+                chatHistory.set(normalizedId, currentHistory);
+                await History.findOneAndUpdate({ chatId: normalizedId }, { messages: currentHistory, lastUpdate: new Date() }, { upsert: true });
             } catch (e) { console.error('Error in passive sync:', e.message); }
         };
 
@@ -237,8 +348,11 @@ async function startBot() {
                 await updateHistoryPassively('assistant', contentToSave || '(وسائط)');
             }
         } else {
+            // **تنبيه خاص بـ "The Real World"**: إذا تأكدت من الوصل وكان المنتج هو "The Real World"، أخبر الزبون أن "حسابك جاهز وسيصلك آلياً بعد لحظات قليلة".
+            // **الدعم الفني للمشتركين القدامى**: إذا وجدت في سجل المحادثة (History) أن الزبون قد اشترى مسبقاً منتج "The Real World" ثم عاد ليسألك عن (كلمة السر الجديدة) أو قال أن (الحساب توقف/تبدل)، لا تطلب منه الدفع مرة أخرى. أخبره بلطف أنك ستزوده بالبيانات المحدثة فوراً، وضع هذا التاغ في ردك: `FETCH_CURRENT_DATA:The Real World`.
+            // - إذا كان الوصل ليس وصل دفع (مثلاً صورة منتج أو سيلفي)، لا تضع التاغ.
             // نسجل رسائل الزبون دائماً في الخلفية
-            // ملاحظة: الزبون يتم معالجة فوكاله بالفعل في البلوك الأساسي، 
+            // ملاحظة: الزبون يتم معالجة فوكاله بالفعل في البلوك الأساسي،
             // لكن للوضع الصامت سنحتاج منطق مشابه هنا أيضاً لضمان الدقة 100%
             let customerContent = text;
             if (!text && msg.message?.audioMessage && (isBotStoppedGlobal || pausedChats.has(normalizedId))) {
@@ -324,10 +438,10 @@ async function startBot() {
                 if (!pausedChats.has(normalizedId) && !pausedChats.has(chatId)) {
                     console.log(`⚠️ Admin intervened: Pausing AI for ${normalizedId} (${customerName})`);
 
-                    // تحديد ما إذا كان الرقم هو LID (أيفون) أو رقم حقيقي
+                    // تحديد ما إذا كان الرقم هو LID أو رقم حقيقي
                     const isLID = chatId.includes('@lid');
-                    const displayPhone = isLID ? `⚠️ أيفون (${customerName})` : normalizedId;
-                    const waLink = isLID ? `ابحث عن "${customerName}" في واتساب` : `https://wa.me/${normalizedId}`;
+                    const displayPhone = isLID ? `🌐 معرف واتساب (${normalizedId})` : normalizedId;
+                    const waLink = isLID ? `<i>(ملاحظة: هذا الزبون يتصل بهوية رقمية، يمكنك البحث عنه بالاسم: ${customerName})</i>` : `https://wa.me/${normalizedId}`;
 
                     // إرسال إشعار تلغرام مع زر التفعيل (مرة واحدة فقط)
                     await sendNotificationWithButton(`⚠️ <b>توقف الرد الآلي</b>
@@ -338,7 +452,7 @@ async function startBot() {
 ⏰ <i>سيعود البوت للعمل تلقائياً بعد 30 دقيقة.</i>`, normalizedId);
                 }
 
-                // 🔒 قفل مزدوج: نوقف كلا المعرفين لضمان صمت البوت مع الأيفون وغيره
+                // 🔒 قفل مزدوج: نوقف كلا المعرفين لضمان صمت البوت
                 pausedChats.add(normalizedId);
                 pausedChats.add(chatId);
 
@@ -370,17 +484,28 @@ async function startBot() {
         console.log(`📩 New message from ${pushName} (${isAudio ? '🎙️ Audio' : isImage ? '🖼️ Image' : '📝 Text'}): ${text || 'No text'}`);
 
         try {
-            // كود معالجة الرسائل العادي يكمل هنا
-
             const data = await fetchCurrentProducts();
-            const context = data ? formatProductsForAI(data) : "منتجاتنا متوفرة.";
+
+            // 🔄 جلب بيانات الحسابات المشتركة (مثلاً TRW) لإضافتها للسياق بذكاء
+            let sharedAccountInfo = "";
+            try {
+                const inventoryPath = './inventory.json';
+                if (fs.existsSync(inventoryPath)) {
+                    const inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+                    if (inventory["The Real World Account"] && inventory["The Real World Account"].length > 0) {
+                        sharedAccountInfo = `\n\n[معلومة سرية للحساب الحالي لـ The Real World: ${inventory["The Real World Account"][0].account}] (استعملها فقط إذا كان الزبون مشتركاً قديماً وسألك عن التحديث).`;
+                    }
+                }
+            } catch (e) { /* ignore */ }
+
+            const context = (data ? formatProductsForAI(data) : "منتجاتنا متوفرة.") + sharedAccountInfo;
 
             // 🔄 تحميل السجل من قاعدة البيانات (MongoDB)
-            if (!chatHistory.has(chatId)) {
-                console.log(`📡 Loading history for ${pushName} from DB...`);
+            if (!chatHistory.has(normalizedId)) {
+                console.log(`📡 Loading history for ${pushName} (${normalizedId}) from DB...`);
                 try {
-                    const dbHistory = await History.findOne({ chatId });
-                    chatHistory.set(chatId, dbHistory ? dbHistory.messages : []);
+                    const dbHistory = await History.findOne({ chatId: normalizedId });
+                    chatHistory.set(normalizedId, dbHistory ? dbHistory.messages : []);
                     if (dbHistory) {
                         console.log(`✅ Loaded ${dbHistory.messages.length} messages from DB for ${pushName}`);
                     } else {
@@ -388,11 +513,11 @@ async function startBot() {
                     }
                 } catch (err) {
                     console.error('❌ Error loading history from DB:', err.message);
-                    chatHistory.set(chatId, []);
+                    chatHistory.set(normalizedId, []);
                 }
             }
 
-            const history = chatHistory.get(chatId) || [];
+            const history = chatHistory.get(normalizedId) || [];
             let imageBase64 = null;
             let audioBase64 = null;
 
@@ -446,8 +571,10 @@ async function startBot() {
                 .replace(/REGISTER_ORDER/g, '')
                 .replace(/CONTACT_ADMIN/g, '')
                 .replace(/STOP_BOT/g, '')
-                .replace(/RECEIPT_DETECTED_TAG/g, '')
+                .replace(/RECEIPT_DATA:[\s\S]*?(\n|$)/g, '')
                 .replace(/BUSINESS_AVAILABILITY_QUERY/g, '')
+                .replace(/CREATE_SUPPORT_TICKET/g, '')
+                .replace(/SEND_IMAGE:[\s\S]*?(\n|$)/g, '')
                 .trim();
 
             // 📢 إشعارات ذكية تعتمد على تاغات الـ AI
@@ -509,6 +636,41 @@ async function startBot() {
                 }
             }
 
+            // 🎫 نظام تذاكر الدعم الفني: إخطار المشرف
+            if (aiResponse.includes('CREATE_SUPPORT_TICKET')) {
+                console.log(`🎫 Support Ticket Created by AI. Notifying Admin...`);
+                await sendNotificationWithButton(`🎫 <b>تذكرة دعم فني جديدة</b>
+👤 الزبون: ${pushName}
+📱 الهاتف: ${normalizedId}
+📝 الحالة: الزبون يواجه مشكلة تقنية وطلب التدخل الفني (بعد موافقته).
+🔗 رابط المحادثة: https://wa.me/${normalizedId}`, normalizedId);
+            }
+
+            // 🖼️ نظام إرسال الصور الذكي (TRW)
+            if (aiResponse.includes('SEND_IMAGE:')) {
+                try {
+                    const imageTag = aiResponse.split('SEND_IMAGE:')[1].split('\n')[0].trim();
+                    const imagePaths = {
+                        'trw_campuses': './assets/trw/campuses.jpg',
+                        'trw_billing': './assets/trw/billing.jpg',
+                        'trw_subtitles': './assets/trw/subtitles.jpg',
+                        'trw_perks': './assets/trw/perks.jpg',
+                        'trw_dashboard': './assets/trw/dashboard.jpg',
+                        'payment_ccp': './assets/payment/ccp.jpg'
+                    };
+
+                    const imagePath = imagePaths[imageTag];
+                    if (imagePath && fs.existsSync(imagePath)) {
+                        console.log(`🖼️ Sending smart TRW image: ${imageTag}`);
+                        await sock.sendMessage(chatId, {
+                            image: fs.readFileSync(imagePath)
+                        });
+                    }
+                } catch (e) {
+                    console.error('❌ Error sending smart image:', e.message);
+                }
+            }
+
             // 🚨 كشف السؤال عن توفر Business
             if (aiResponse.includes('BUSINESS_AVAILABILITY_QUERY')) {
                 console.log(`🔍 Business Availability Query Detected. Notifying Admin...`);
@@ -547,10 +709,10 @@ async function startBot() {
             history.push({ role: 'assistant', text: cleanResponse });
 
             if (history.length > 40) history.shift();
-            chatHistory.set(chatId, history);
+            chatHistory.set(normalizedId, history);
 
             await History.findOneAndUpdate(
-                { chatId },
+                { chatId: normalizedId },
                 { messages: history, lastUpdate: new Date() },
                 { upsert: true }
             ).catch(err => console.error('❌ Error saving to DB:', err));
@@ -560,10 +722,43 @@ async function startBot() {
                 notifyNewLead({ number: chatId, pushname: pushName }, "طلب مبيعات (مؤكد)", text).catch(() => { });
             }
 
-            // 🚨 كشف الوصل الحقيقي عبر الذكاء الاصطناعي
-            if (aiResponse.includes('RECEIPT_DETECTED_TAG')) {
+            // 🚨 كشف الوصل الحقيقي عبر الذكاء الاصطناعي (مع قراءة البيانات)
+            if (aiResponse.includes('RECEIPT_DATA:')) {
+                try {
+                    const dataPart = aiResponse.split('RECEIPT_DATA:')[1].trim();
+                    const jsonMatch = dataPart.match(/\{.*?\}/);
+                    if (jsonMatch) {
+                        const receipt = JSON.parse(jsonMatch[0]);
+                        console.log(`🖼️ Confirmed Receipt: Amount ${receipt.amount}, Ref ${receipt.ref}. Notifying Admin...`);
+
+                        await sendNotificationWithButton(`🖼️ <b>وصل دفع (تم التحقق تلقائياً)</b>
+👤 الإسم: ${pushName}
+💰 المبلغ المستخرج: <b>${receipt.amount} DA</b>
+🔢 مرجع العملية: <code>${receipt.ref}</code>
+📱 رابط المحادثة: https://wa.me/${normalizedId}`, chatId);
+
+                        // 🚀 محاولة التسليم الآلي لـ The Real World
+                        if (receipt.product && (receipt.product.toLowerCase().includes('the real world') || receipt.product.toLowerCase().includes('trw'))) {
+                            console.log(`🚚 Starting Auto-Delivery for ${pushName}...`);
+                            const delivered = await handleAutoDelivery(receipt.product, chatId, normalizedId, sock);
+                            if (delivered) {
+                                console.log(`✅ Auto-Delivery completed for ${pushName}`);
+                            } else {
+                                console.log(`⚠️ Auto-Delivery failed (Out of Stock or logic error)`);
+                                await sendNotification(`⚠️ <b>فشل التسليم الآلي:</b> المنتج ${receipt.product} نفد من المخزون أو حدث خطأ. يرجى التدخل يدوياً.`);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.error('Error parsing RECEIPT_DATA:', e.message);
+                    // Fallback to simple notification if JSON fails
+                    await sendNotificationWithButton(`🖼️ <b>وصل دفع (تحقق بسيط)</b>
+👤 الإسم: ${pushName}
+📱 رابط المحادثة: https://wa.me/${normalizedId}`, chatId);
+                }
+            } else if (aiResponse.includes('RECEIPT_DETECTED_TAG')) {
                 console.log(`🖼️ Confirmed Receipt Detected by AI. Notifying Admin...`);
-                await sendNotificationWithButton(`🖼️ *وصل دفع حقيقي (تم تأكيده بالذكاء الاصطناعي)*\n👤 الإسم: ${pushName}\n📱 رابط المحادثة: https://wa.me/${chatId.split('@')[0]}`, chatId);
+                await sendNotificationWithButton(`🖼️ *وصل دفع حقيقي (تم تأكيده بالذكاء الاصطناعي)*\n👤 الإسم: ${pushName}\n📱 رابط المحادثة: https://wa.me/${normalizedId}`, chatId);
             }
 
             // 📊 تسجيل البيعة في Google Sheets (انتظار تأكيد الأدمن من تلغرام)

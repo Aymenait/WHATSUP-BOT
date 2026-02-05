@@ -115,6 +115,22 @@ async function startTelegramPolling(onAction) {
                         onAction({ action: 'start_bot' });
                     } else if (text === '/restart') {
                         onAction({ action: 'restart_bot' });
+                    } else if (text === '/help' || text === '/h' || text === 'help') {
+                        const helpMsg = `📖 <b>قائمة الأوامر المتوفرة:</b>
+
+/inventory - لعرض المخزون الحالي
+/set_trw [email:pass] - لتحديث حساب TRW
+/stop - إيقاف البوت عن الرد كلياً
+/start - إعادة تشغيل البوت كلياً
+/restart - إعادة تشغيل السيرفر
+/ping - للتأكد أن البوت متصل
+/help - لعرض هذه القائمة`;
+                        sendNotification(helpMsg);
+                    } else if (text.startsWith('/set_trw ')) {
+                        const accountData = text.replace('/set_trw ', '').trim();
+                        onAction({ action: 'set_trw', waChatId: accountData }); // waChatId is reused here for the raw data
+                    } else if (text === '/inventory') {
+                        onAction({ action: 'show_inventory' });
                     } else if (text === '/ping') {
                         sendNotification("🏓 Pong! البوت شغال وعال العال.");
                     }
