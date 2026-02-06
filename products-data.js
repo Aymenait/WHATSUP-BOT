@@ -6,10 +6,10 @@ export const PRODUCTS_DATA = {
             keywords: ["andrew tate", "trw", "business", "e-commerce", "trading", "money making", "real time platform"],
             delivery_type: "email_password",
             price_dzd: 2900,
-            price_usd: 12,
+            price_usd: 11.6,
             description: "دخول رسمي لمنصة The Real World (خطة Veteran Plan) المفعلة منذ ديسمبر 2024. تشمل كل الكورسات والدردشات الحية (ليست فيديوهات مسجلة فقط).",
             durations: [
-                { key: "1month", price_dzd: 2900, price_usd: 12 }
+                { key: "1month", price_dzd: 2900, price_usd: 11.6 }
             ]
         },
         {
@@ -18,12 +18,12 @@ export const PRODUCTS_DATA = {
             keywords: ["gpt-5.2", "openai", "writing", "analysis", "ai assistance", "business", "workspace", "plus"],
             delivery_type: "email_invite",
             price_dzd: 1000,
-            price_usd: 5,
+            price_usd: 4,
             description: "اشتراك ChatGPT 5.2 بأحدث النماذج. اختر بين تفعيل Business الاحترافي على إيميلك الشخصي أو حساب Plus خاص غير محدود.",
             durations: [
-                { key: "business", price_dzd: 1000, price_usd: 5, description: "ChatGPT 5.2 Business (1000 DA) - تفعيل رسمي على إيميلك الشخصي. يحتوي على ميزات 'Pro' الكاملة. تنبيه: الـ Workspace يغلق بعد شهر ولا يمكن رؤية السجل (History)." },
-                { key: "plus", price_dzd: 1200, price_usd: 6, description: "ChatGPT 5.2 Plus (1200 DA) - حساب خاص جديد (إيميل وباسورد). استخدام غير محدود، والحساب يبقى مفتوحاً كـ Free Plan بعد شهر (السجل History يبقى محفوظاً)." },
-                { key: "reseller", price_dzd: 2000, price_usd: 10, description: "عرض الجملة: حساب (إيميل + باسورد) بميزات Business (ChatGPT 5.2)، يمكنك إضافة 5 أشخاص معك (1+5)." }
+                { key: "business", price_dzd: 1000, price_usd: 4, description: "ChatGPT 5.2 Business (1000 DA) - تفعيل رسمي على إيميلك الشخصي. يحتوي على ميزات 'Pro' الكاملة. تنبيه: الـ Workspace يغلق بعد شهر ولا يمكن رؤية السجل (History)." },
+                { key: "plus", price_dzd: 1200, price_usd: 4.8, description: "ChatGPT 5.2 Plus (1200 DA) - حساب خاص جديد (إيميل وباسورد). استخدام غير محدود، والحساب يبقى مفتوحاً كـ Free Plan بعد شهر (السجل History يبقى محفوظاً)." },
+                { key: "reseller", price_dzd: 2000, price_usd: 8, description: "عرض الجملة: حساب (إيميل + باسورد) بميزات Business (ChatGPT 5.2)، يمكنك إضافة 5 أشخاص معك (1+5)." }
             ]
         },
         {
@@ -32,13 +32,22 @@ export const PRODUCTS_DATA = {
             keywords: ["photoshop", "illustrator", "premiere", "design", "video editing", "designer", "firefly credits", "ai design"],
             delivery_type: "email_password",
             price_dzd: 1500,
-            price_usd: 5.5,
+            price_usd: 6,
             description: "حساب Adobe Creative Cloud جديد خاص بك (Private Account) مع تحكم كامل. يشمل أكثر من 20 تطبيقاً احترافياً (Photoshop, Illustrator, Premiere Pro, After Effects) + 4000 نقطة للذكاء الاصطناعي (Firefly Credits). يدعم جهازين مع إمكانية تغيير الإيميل والباسورد وضمان كامل طول فترة الاشتراك.",
             durations: [
-                { key: "1month", price_dzd: 1500, price_usd: 5.5, description: "اشتراك رسمي لمدة 30 يوم" },
-                { key: "2months", price_dzd: 2500, price_usd: 9.2, description: "اشتراك رسمي لمدة 60 يوم" },
-                { key: "3months", price_dzd: 3200, price_usd: 11.8, description: "اشتراك رسمي لمدة 90 يوم كاملة" }
-            ]
+                { key: "1month", price_dzd: 1500, price_usd: 6, description: "اشتراك رسمي لمدة 30 يوم" },
+                { key: "2months", price_dzd: 2500, price_usd: 10, description: "اشتراك رسمي لمدة 60 يوم" },
+                { key: "3months", price_dzd: 3200, price_usd: 12.8, description: "اشتراك رسمي لمدة 90 يوم كاملة" }
+            ],
+            reseller_info: {
+                min_quantity: 5,
+                offers: [
+                    { duration: "1 Month", wholesale_dzd: 900, wholesale_usd: 3.6, suggested_retail_dzd: 1500 },
+                    { duration: "2 Months", wholesale_dzd: 1400, wholesale_usd: 5.6, suggested_retail_dzd: 2800 },
+                    { duration: "3 Months", wholesale_dzd: 1900, wholesale_usd: 7.6, suggested_retail_dzd: 4000 },
+                    { duration: "1 Year", wholesale_dzd: 7000, wholesale_usd: 28, suggested_retail_dzd: 13000 }
+                ]
+            }
         },
         {
             name: "Gamma.AI",
@@ -46,10 +55,10 @@ export const PRODUCTS_DATA = {
             keywords: ["slides", "presentation", "powerpoint", "ai design"],
             delivery_type: "email_password",
             price_dzd: 1200,
-            price_usd: 4.5,
+            price_usd: 4.8,
             description: "حساب Gamma.AI للعروض التقديمية (إيميل وكلمة سر)",
             durations: [
-                { key: "1month", price_dzd: 1200, price_usd: 4.5 },
+                { key: "1month", price_dzd: 1200, price_usd: 4.8 },
                 { key: "3months", price_dzd: 2900, price_usd: 11.6 }
             ]
         },
@@ -70,11 +79,11 @@ export const PRODUCTS_DATA = {
             keywords: ["design", "social media", "templates", "easy design"],
             delivery_type: "invite_link",
             price_dzd: 600,
-            price_usd: 2.5,
+            price_usd: 2.4,
             description: "اشتراك Canva Pro (يرسل الزبون إيميله الشخصي لاستقبال دعوة التفعيل)",
             durations: [
-                { key: "1year", price_dzd: 600, price_usd: 2.5 },
-                { key: "reseller", price_dzd: 3900, price_usd: 16, delivery_type: "full_access", description: "حساب ريسيلر كامل (3 سنوات) مع إيميل التحكم لتغيير المعلومات، يتيح لك إضافة 500 عضو (500 People)" }
+                { key: "1year", price_dzd: 600, price_usd: 2.4 },
+                { key: "reseller", price_dzd: 3900, price_usd: 15.6, delivery_type: "full_access", description: "حساب ريسيلر كامل (3 سنوات) مع إيميل التحكم لتغيير المعلومات، يتيح لك إضافة 500 عضو (500 People)" }
             ]
         },
         {
@@ -83,14 +92,23 @@ export const PRODUCTS_DATA = {
             keywords: ["video editor", "tiktok", "reels", "ai video", "no watermark"],
             delivery_type: "email_password",
             price_dzd: 800,
-            price_usd: 3,
+            price_usd: 3.2,
             description: "محرر فيديو احترافي مع خصوصية تامة لمحتواك (مساحة عمل خاصة). يدعم التصدير بجودة 4K بدون علامة مائية مع ضمان كامل طوال فترة الاشتراك.",
             durations: [
-                { key: "1month", price_dzd: 800, price_usd: 3 },
-                { key: "3months", price_dzd: 1200, price_usd: 4.5 },
+                { key: "1month", price_dzd: 800, price_usd: 3.2 },
+                { key: "3months", price_dzd: 1200, price_usd: 4.8 },
                 { key: "6months", price_dzd: 2000, price_usd: 8 },
                 { key: "1year", price_dzd: 3500, price_usd: 14 }
-            ]
+            ],
+            reseller_info: {
+                min_quantity: 5,
+                offers: [
+                    { duration: "1 Month", wholesale_dzd: 450, wholesale_usd: 1.8, suggested_retail_dzd: 800 },
+                    { duration: "3 Months", wholesale_dzd: 700, wholesale_usd: 2.8, suggested_retail_dzd: 1200 },
+                    { duration: "6 Months", wholesale_dzd: 1000, wholesale_usd: 4.0, suggested_retail_dzd: 2000 },
+                    { duration: "1 Year", wholesale_dzd: 1500, wholesale_usd: 6.0, suggested_retail_dzd: 3500 }
+                ]
+            }
         },
         {
             name: "Netflix Premium",
@@ -98,13 +116,20 @@ export const PRODUCTS_DATA = {
             keywords: ["movies", "series", "entertainment", "4k"],
             delivery_type: "email_password",
             price_dzd: 600,
-            price_usd: 2.5,
+            price_usd: 2.4,
             description: "حساب Netflix Premium مشترك بجودة 4K Ultra HD، مع بروفايل خاص بك (Personal Profile) محمي لضمان خصوصيتك.",
             durations: [
-                { key: "1month", price_dzd: 600, price_usd: 2.5 },
-                { key: "3months", price_dzd: 1200, price_usd: 4.5 },
+                { key: "1month", price_dzd: 600, price_usd: 2.4 },
+                { key: "3months", price_dzd: 1200, price_usd: 4.8 },
                 { key: "12months", price_dzd: 2000, price_usd: 8 }
-            ]
+            ],
+            reseller_info: {
+                min_quantity: 5,
+                offers: [
+                    { duration: "1 Month", wholesale_dzd: 400, wholesale_usd: 1.6, suggested_retail_dzd: 800 },
+                    { duration: "3 Months", wholesale_dzd: 700, wholesale_usd: 2.8, suggested_retail_dzd: 1500 }
+                ]
+            }
         },
         {
             name: "TradingView Premium",
@@ -150,10 +175,10 @@ export const PRODUCTS_DATA = {
             keywords: ["amazon movies", "series", "entertainment"],
             delivery_type: "email_password",
             price_dzd: 1200,
-            price_usd: 4.5,
+            price_usd: 4.8,
             description: "اشتراك Amazon Prime Video لمدة 3 أشهر (إيميل وكلمة سر)",
             durations: [
-                { key: "3months", price_dzd: 1200, price_usd: 4.5 }
+                { key: "3months", price_dzd: 1200, price_usd: 4.8 }
             ]
         },
         {
@@ -162,10 +187,10 @@ export const PRODUCTS_DATA = {
             keywords: ["anime", "otaku", "japanese series"],
             delivery_type: "email_password",
             price_dzd: 1200,
-            price_usd: 4.5,
+            price_usd: 4.8,
             description: "اشتراك Crunchyroll Premium لمشاهدة الانمي. حساب مشترك (Shared) لمدة شهر واحد.",
             durations: [
-                { key: "1month", price_dzd: 1200, price_usd: 4.5 }
+                { key: "1month", price_dzd: 1200, price_usd: 4.8 }
             ]
         },
         {
@@ -212,7 +237,7 @@ export const PRODUCTS_DATA = {
             keywords: ["google ai", "gemini ultra", "gemini pro", "google assistant", "ai productivity"],
             delivery_type: "email_password",
             price_dzd: 1800,
-            price_usd: 8,
+            price_usd: 7.2,
             description: "اشتراك Gemini Ultra و Veo 3 مع أدوات إنتاجية متقدمة. (حالياً غير متوفر - Sold Out)",
             available: false,
             durations: []
