@@ -670,7 +670,10 @@ async function startBot() {
                         'trw_subtitles': './assets/trw/subtitles.jpg',
                         'trw_perks': './assets/trw/perks.jpg',
                         'trw_dashboard': './assets/trw/dashboard.jpg',
-                        'payment_ccp': './assets/payment/ccp.jpg'
+                        'payment_ccp': './assets/payment/ccp.jpg',
+                        'reseller_adobe': './assets/resellers/adobe.jpg',
+                        'reseller_netflix': './assets/resellers/netflix.jpg',
+                        'reseller_capcut': './assets/resellers/capcut.jpg'
                     };
 
                     const imagePath = imagePaths[imageTag];
