@@ -24,7 +24,13 @@ export const PRODUCTS_DATA = {
                 { key: "business", price_dzd: 1000, price_usd: 5, description: "ChatGPT 5.2 Business (1000 DA) - تفعيل رسمي على إيميلك الشخصي. يحتوي على ميزات 'Pro' الكاملة. تنبيه: الـ Workspace يغلق بعد شهر ولا يمكن رؤية السجل (History)." },
                 { key: "plus", price_dzd: 1200, price_usd: 6, description: "ChatGPT 5.2 Plus (1200 DA) - حساب خاص جديد (إيميل وباسورد). استخدام غير محدود، والحساب يبقى مفتوحاً كـ Free Plan بعد شهر (السجل History يبقى محفوظاً)." },
                 { key: "reseller", price_dzd: 2000, price_usd: 10, description: "عرض الجملة: حساب (إيميل + باسورد) بميزات Business (ChatGPT 5.2)، يمكنك إضافة 5 أشخاص معك (1+5)." }
-            ]
+            ],
+            reseller_info: {
+                min_quantity: 5,
+                offers: [
+                    { duration: "1 Month (Plus)", wholesale_dzd: 700, wholesale_usd: 2.8, suggested_retail_dzd: 1200 }
+                ]
+            }
         },
         {
             name: "Adobe Creative Cloud",
@@ -247,11 +253,12 @@ export const PRODUCTS_DATA = {
             name: "العرض العام للجملة (Resellers)",
             category: "Wholesale",
             keywords: ["جملة", "wholesale", "reseller", "أسعار التجار", "تخفيض"],
-            description: "قائمة أسعار الجملة لجميع المنتجات (للتجار والشركاء المعتمدين فقط). أقل كمية للطلب هي 5 حسابات متنوعة.",
+            description: "قائمة أسعار الجملة لجميع المنتجات (للتجار والشركاء المعتمدين فقط). نظام مميز يوفر لك أسعار تنافسية مع إمكانية تجربة الخدمة قبل الالتزام بالجملة الكاملة.",
             wholesale_list: [
                 { product: "Adobe Creative Cloud", offers: ["1 شهر: 900 دج", "2 شهر: 1400 دج", "3 شهر: 1900 دج", "1 سنة: 7000 دج"], details: "حساب خاص (Private) بكامل الصلاحيات، يدعم جهازين، مع ضمان كامل." },
                 { product: "Netflix Premium (4K HD)", offers: ["1 شهر: 400 دج", "3 شهر: 700 دج"], details: "حساب مشترك ببروفايل خاص محمي بكلمة سر للزبون." },
-                { product: "CapCut Pro", offers: ["1 شهر: 450 دج", "3 شهر: 700 دج", "6 شهر: 1000 دج", "1 سنة: 1500 دج"], details: "حساب مشترك بخصوصية تامة ومساحة عمل خاصة." }
+                { product: "CapCut Pro", offers: ["1 شهر: 450 دج", "3 شهر: 700 دج", "6 شهر: 1000 دج", "1 سنة: 1500 دج"], details: "حساب مشترك بخصوصية تامة ومساحة عمل خاصة." },
+                { product: "ChatGPT Plus", offers: ["1 شهر: 700 دج"], details: "حساب ChatGPT Plus بميزات احترافية (الجملة لتجار الحسابات)." }
             ],
             notes: "نظام المحفظة (Wallet) متوفر لشحن الرصيد والسحب الفوري للحسابات لتوفير الوقت."
         }

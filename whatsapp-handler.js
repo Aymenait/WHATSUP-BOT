@@ -27,12 +27,24 @@ const contactNames = new Map(); // خارطة لحفظ أسماء الزبائن
 const pendingSales = new Map(); // حفظ بيانات المبيعات بانتظار التأكيد من تلغرام
 let isBotStoppedGlobal = false; // متغير للتحكم في تشغيل البوت بالكامل
 
-const AUTO_RESUME_DELAY = 2 * 60 * 60 * 1000; // 2 hours
+const AUTO_RESUME_DELAY = 24 * 60 * 60 * 1000; // 24 hours
 
 /**
- * دالة لإعادة تفعيل البوت لشات معين
- * تحذف كل المعرفات المرتبطة بالرقم (normalizedId و chatId)
- */
+* دالة لتوليد معرف مميز للعمليات
+*/
+function generateTransactionId() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // حذفت الأحرف المتشابهة مثل 0 و O
+    let result = 'TRX-';
+    for (let i = 0; i < 6; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+/**
+  * دالة لإعادة تفعيل البوت لشات معين
+  * تحذف كل المعرفات المرتبطة بالرقم (normalizedId و chatId)
+  */
 function resumeChat(chatId) {
     // استخراج الرقم الصافي من أي معرف
     const digits = chatId.replace(/\D/g, '');
@@ -449,37 +461,33 @@ async function startBot() {
             if (isAdminAction) {
                 // نرسل الإشعار فقط إذا لم يكن الشات موقوفاً بالفعل (لمنع التكرار المزعج)
                 if (!pausedChats.has(normalizedId) && !pausedChats.has(chatId)) {
-                    console.log(`⚠️ Admin intervened: Pausing AI for ${normalizedId} (${customerName})`);
-
-                    // تحديد ما إذا كان الرقم هو LID أو رقم حقيقي
+                    console.log(`⚠️ Admin intervened: Pausing AI for ${normalizedId}`);
                     const isLID = chatId.includes('@lid');
-                    const displayPhone = isLID ? `🌐 معرف واتساب (${normalizedId})` : normalizedId;
-                    const waLink = isLID ? `<i>(ملاحظة: هذا الزبون يتصل بهوية رقمية، يمكنك البحث عنه بالاسم: ${customerName})</i>` : `https://wa.me/${normalizedId}`;
+                    const displayPhone = isLID ? `🌐 معرف (${normalizedId})` : normalizedId;
 
-                    // إرسال إشعار تلغرام مع زر التفعيل (مرة واحدة فقط)
                     await sendNotificationWithButton(`⚠️ <b>توقف الرد الآلي</b>
 👤 الزبون: ${customerName}
 📱 الهاتف: ${displayPhone}
 💬 تدخل المشرف برسالة
-🔗 ${waLink}
-⏰ <i>سيعود البوت للعمل تلقائياً بعد 30 دقيقة.</i>`, normalizedId);
+⏰ <i>سيعود البوت للعمل تلقائياً بعد 24 ساعة (أو فعلّه يدوياً).</i>`, normalizedId);
                 }
 
-                // 🔒 قفل مزدوج: نوقف كلا المعرفين لضمان صمت البوت
                 pausedChats.add(normalizedId);
                 pausedChats.add(chatId);
 
-                // Clear any existing timer for this chat
+                // تنظيف التايمر القديم إذا وجد
                 if (autoResumeTimers.has(normalizedId)) {
                     clearTimeout(autoResumeTimers.get(normalizedId));
                 }
 
-                // Set auto-resume after delay
+                // ضبط التفعيل التلقائي بعد 24 ساعة
+                const AUTO_RESUME_DELAY = 24 * 60 * 60 * 1000; // 24 hours
                 const timer = setTimeout(() => {
                     if (pausedChats.has(normalizedId)) {
                         resumeChat(normalizedId);
-                        pausedChats.delete(chatId); // حذف الـ chatId أيضاً
-                        sendNotification(`⏰ <b>تفعيل تلقائي:</b> مرّت 30 دقيقة بدون تدخل، عاد البوت للعمل مع ${customerName}.`);
+                        pausedChats.delete(normalizedId); // Ensure both are deleted
+                        pausedChats.delete(chatId);
+                        sendNotification(`⏰ <b>تفعيل تلقائي:</b> مرت 24 ساعة، عاد البوت للعمل مع ${customerName}.`);
                     }
                 }, AUTO_RESUME_DELAY);
 
@@ -564,6 +572,13 @@ async function startBot() {
             // تنفيذ الرد مع تمرير الميديا إن وجدت
             let aiResponse = await generateResponse(text, context, history, imageBase64, audioBase64);
 
+            // 🔑 توليد وحقن معرف العملية إذا وجدت بيعة
+            if (aiResponse.includes('ID_PENDING')) {
+                const trxId = generateTransactionId();
+                aiResponse = aiResponse.replace(/ID_PENDING/g, trxId);
+                console.log(`🔗 Generated Transaction ID: ${trxId}`);
+            }
+
             // تنظيف الرد من الكلمات البرمجية قبل إرساله للزبون
             let audioSummary = "";
             let imageSummary = "";
@@ -580,6 +595,7 @@ async function startBot() {
                 .replace(/AUDIO_SUMMARY:.*?\n/g, '')
                 .replace(/IMAGE_SUMMARY:[\s\S]*?\n\n/g, '')
                 .replace(/IMAGE_SUMMARY:.*?\n/g, '')
+                // نحافظ على التاغ في المتغير المساعد لحفظه في الداتابيز، ولكن نحذفه من الرسالة المرسلة
                 .replace(/SAVE_SALE_TAG:[\s\S]*?(\n|$)/g, '')
                 .replace(/REGISTER_ORDER/g, '')
                 .replace(/CONTACT_ADMIN/g, '')
@@ -589,6 +605,12 @@ async function startBot() {
                 .replace(/CREATE_SUPPORT_TICKET/g, '')
                 .replace(/SEND_IMAGE:[\s\S]*?(\n|$)/g, '')
                 .replace(/FETCH_CURRENT_DATA:[\s\S]*?(\n|$)/g, '')
+                .trim();
+
+            // 💾 تحضير الرد للحفظ في التاريخ (يشمل التاغات المهمة للربط المستقبلي)
+            const historyResponse = aiResponse
+                .replace(/AUDIO_SUMMARY:[\s\S]*?\n\n/g, '')
+                .replace(/IMAGE_SUMMARY:[\s\S]*?\n\n/g, '')
                 .trim();
 
             // 📢 إشعارات ذكية تعتمد على تاغات الـ AI
@@ -755,7 +777,7 @@ async function startBot() {
             const userHistoryText = text || (isAudio ? (audioSummary ? `🎙️ (فوكال): ${audioSummary}` : '(صوت)') : isImage ? (imageSummary ? `🖼️ (صورة): ${imageSummary}` : '(صورة)') : '...');
 
             history.push({ role: 'user', text: userHistoryText });
-            history.push({ role: 'assistant', text: cleanResponse });
+            history.push({ role: 'assistant', text: historyResponse });
 
             if (history.length > 40) history.shift();
             chatHistory.set(normalizedId, history);
