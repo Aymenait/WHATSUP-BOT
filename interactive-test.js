@@ -10,7 +10,7 @@ const rl = readline.createInterface({
 });
 
 async function startChat() {
-    console.log('\n=== 🤖 تجربة بوت Market Algeria (Interative Test) ===');
+    console.log('\n=== 🤖 تجربة بوت 3Ahub (Interative Test) ===');
     console.log('--- اكتب رسالتك واضغط Enter (اكتب "exit" للخروج) ---\n');
 
     // سياق المنتجات (محاكاة لما سيراه البوت)

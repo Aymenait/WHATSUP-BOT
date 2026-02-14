@@ -2,7 +2,7 @@
     "name": "whatsapp-ai-bot",
     "version": "1.0.0",
     "type": "module",
-    "description": "WhatsApp AI Bot for Market Algeria - 24/7 automated customer support",
+    "description": "WhatsApp AI Bot for 3Ahub - 24/7 automated customer support",
     "main": "server.js",
     "scripts": {
         "start": "node server.js",

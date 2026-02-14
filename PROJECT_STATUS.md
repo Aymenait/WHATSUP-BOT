@@ -3,7 +3,7 @@
 ## ✅ ما تم إنجازه حتى الآن
 
 ### **1. Telegram Bot Setup** ✅
-- **Bot Name:** MARKET ALGERIAA SUPPORT
+- **Bot Name:** 3Ahub SUPPORT
 - **Username:** @Aymenmarket_bot
 - **Token:** `8435398259:AAHRrvwcXtnEHtIK-pkwZ9WmRNLO3wJNHrk`
 - **Chat ID:** `1964665040`

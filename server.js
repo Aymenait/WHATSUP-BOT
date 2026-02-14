@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 8000;
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => res.json({ status: 'ok', message: 'Market Algeria AI Bot' }));
+app.get('/', (req, res) => res.json({ status: 'ok', message: '3Ahub AI Bot' }));
 
 app.get('/api/products', (req, res) => {
     try {
@@ -23,7 +23,7 @@ app.get('/api/products', (req, res) => {
     }
 });
 
-console.log('🚀 Starting Market Algeria AI Bot...');
+console.log('🚀 Starting 3Ahub AI Bot...');
 
 app.listen(PORT, () => {
     console.log(`📡 API Server running on port ${PORT}`);
