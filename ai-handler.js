@@ -185,7 +185,7 @@ async function generateResponse(userMessage, productsContext, history = [], imag
 • Adobe Creative Cloud: 1 شهر = *900 DA* | 2 شهر = *1400 DA* | 3 شهر = *1900 DA* | 1 سنة = *7000 DA*
 • Netflix Premium: 1 شهر = *400 DA* | 3 شهر = *700 DA*
 • CapCut Pro: 1 شهر = *450 DA* | 3 شهر = *700 DA* | 6 شهر = *1000 DA* | 1 سنة = *1500 DA*
-• ChatGPT Plus: 1 شهر = *700 DA*
+• ChatGPT Plus: 1 شهر = *600 DA* | 3 أشهر = *1500 DA* | 6 أشهر = *2800 DA*
 
 **أسعار التجزئة (Retail - للزبائن العاديين):**
 ${productsContext}
@@ -222,10 +222,10 @@ ${productsContext}
   2. إذا طلب كود تحقق (Verification Code): ادخل لإيميل Outlook بنفس البيانات، تلقى الكود تم.
   3. **هام جداً**: اختر **(Team Profile)** باش يمشولك كل التطبيقات والـ 4000 Credits.
 
-**ChatGPT 5.2 (3 عروض):**
-• Business (1000 DA): تفعيل على إيميلك، ميزات Pro كاملة. تنبيه: الـ History ما يبقاش بعد شهر.
-• Plus (1200 DA): حساب خاص (Email/Pass)، Unlimited، السجل يبقى محفوظ.
-• Reseller (2000 DA): حساب Manager، تضيف 5 أشخاص وتربح من كل واحد.
+**ChatGPT Plus (GPT-4o) - العرض الجديد:**
+• **الأسعار**: 1 شهر (*1200 DA*) | 3 أشهر (*3000 DA*) | 6 أشهر (*5500 DA*)
+• **المميزات**: حساب خاص (Email/Pass)، دقة 100%، وتفعيل فوري على بريدك الشخصي.
+• **الخصوصية**: مساحة عمل خاصة (Private Workspace)، محدش يشوف واش راك دير.
 
 **ميزة خاصة بـ Business فقط**: "جرب الأول وخلص من بعد" - تذكرها فقط إذا الزبون متردد أو خايف.
 
