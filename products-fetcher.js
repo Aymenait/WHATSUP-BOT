@@ -24,17 +24,28 @@ function formatProductsForAI(data) {
         if (p.durations && p.durations.length > 0) {
             productsText += `💰 الأسعار المتوفرة لهذا المنتج:\n`;
             p.durations.forEach(d => {
-                // d.key هو المدة (مثلا: 1_month, 12_months)
-                let durationName = d.key.replace('_', ' ');
+                let durationName = d.key;
 
-                // تصحيح المدد للـ ChatGPT والخطط الأخرى التي ليس لها اسم مدة واضح
-                if (d.key === 'plus' || d.key === 'go') {
-                    durationName += ' (مدة شهر واحد - 1 Month)';
-                } else if (d.key === 'teachers') {
-                    durationName += ' (مدة سنة كاملة - 1 Year)';
+                // Map standard keys to readable format
+                const durationMap = {
+                    '1month': '1 Month',
+                    '3months': '3 Months',
+                    '6months': '6 Months',
+                    '1year': '1 Year',
+                    'lifetime': 'Lifetime'
+                };
+
+                if (durationMap[d.key]) {
+                    durationName = durationMap[d.key];
+                } else {
+                    durationName = d.key.replace('_', ' ');
                 }
 
-                productsText += `   - ${durationName}: السعر ${d.price_dzd} DA / $${d.price_usd} USD\n`;
+                if (d.description) {
+                    productsText += `   - ${durationName}: ${d.description} (السعر: ${d.price_dzd} DA / $${d.price_usd} USD)\n`;
+                } else {
+                    productsText += `   - ${durationName}: السعر ${d.price_dzd} DA / $${d.price_usd} USD\n`;
+                }
             });
         } else {
             productsText += `💰 السعر: ${p.price_dzd} DA / $${p.price_usd || 'N/A'} USD\n`;

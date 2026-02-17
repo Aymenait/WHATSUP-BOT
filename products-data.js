@@ -17,18 +17,20 @@ export const PRODUCTS_DATA = {
             category: "AI Chat & Assistant",
             keywords: ["gpt-5.2", "openai", "writing", "analysis", "ai assistance", "business", "workspace", "plus"],
             delivery_type: "email_invite",
-            price_dzd: 1000,
-            price_usd: 5,
-            description: "اشتراك ChatGPT 5.2 بأحدث النماذج. اختر بين تفعيل Business الاحترافي على إيميلك الشخصي أو حساب Plus خاص غير محدود.",
+            price_dzd: 800,
+            price_usd: 3.2,
+            description: "اشتراك ChatGPT 5.2 بأحدث النماذج. حساب خاص (Private Workspace) مع ضمان كامل.",
             durations: [
-                { key: "business", price_dzd: 1000, price_usd: 5, description: "ChatGPT 5.2 Business (1000 DA) - تفعيل رسمي على إيميلك الشخصي. يحتوي على ميزات 'Pro' الكاملة. تنبيه: الـ Workspace يغلق بعد شهر ولا يمكن رؤية السجل (History)." },
-                { key: "plus", price_dzd: 1200, price_usd: 6, description: "ChatGPT 5.2 Plus (1200 DA) - حساب خاص جديد (إيميل وباسورد). استخدام غير محدود، والحساب يبقى مفتوحاً كـ Free Plan بعد شهر (السجل History يبقى محفوظاً)." },
-                { key: "reseller", price_dzd: 2000, price_usd: 10, description: "عرض الجملة: حساب (إيميل + باسورد) بميزات Business (ChatGPT 5.2)، يمكنك إضافة 5 أشخاص معك (1+5)." }
+                { key: "1month", price_dzd: 800, price_usd: 3.2, description: "ChatGPT Premium - 1 Month (800 DA) - اشتراك شهري." },
+                { key: "3months", price_dzd: 2200, price_usd: 8.8, description: "ChatGPT Premium - 3 Months (2200 DA) - توفير ممتاز." },
+                { key: "6months", price_dzd: 4000, price_usd: 16, description: "ChatGPT Premium - 6 Months (4000 DA) - أفضل قيمة." }
             ],
             reseller_info: {
                 min_quantity: 5,
                 offers: [
-                    { duration: "1 Month (Plus)", wholesale_dzd: 700, wholesale_usd: 2.8, suggested_retail_dzd: 1200 }
+                    { duration: "1 Month", wholesale_dzd: 500, wholesale_usd: 2.0, suggested_retail_dzd: 800 },
+                    { duration: "3 Months", wholesale_dzd: 1200, wholesale_usd: 4.8, suggested_retail_dzd: 2200 },
+                    { duration: "6 Months", wholesale_dzd: 2000, wholesale_usd: 8.0, suggested_retail_dzd: 4000 }
                 ]
             }
         },
@@ -62,11 +64,12 @@ export const PRODUCTS_DATA = {
             keywords: ["slides", "presentation", "powerpoint", "ai design"],
             delivery_type: "email_password",
             price_dzd: 1200,
-            price_usd: 4.5,
-            description: "حساب Gamma.AI للعروض التقديمية (إيميل وكلمة سر)",
+            price_usd: 6,
+            description: "حساب Gamma.AI للعروض التقديمية. يتوفر بثلاث خطط: 1 شهر (Pro Shared) بسعر 1200 دج، 1 شهر (Plus Private) بسعر 2500 دج، و 1 شهر (Pro Private) بسعر 3500 دج.",
             durations: [
-                { key: "1month", price_dzd: 1200, price_usd: 4.5 },
-                { key: "3months", price_dzd: 2900, price_usd: 11.6 }
+                { key: "1month", price_dzd: 1200, price_usd: 6, description: "Pro Shared - حساب مشترك (1 شهر)" },
+                { key: "private_1month", price_dzd: 2500, price_usd: 10, description: "Plus Private - حساب خاص (1 شهر)" },
+                { key: "private_pro_1month", price_dzd: 3500, price_usd: 14, description: "Pro Private - حساب خاص احترافي (1 شهر)" }
             ]
         },
         {
@@ -258,7 +261,7 @@ export const PRODUCTS_DATA = {
                 { product: "Adobe Creative Cloud", offers: ["1 شهر: 900 دج", "2 شهر: 1400 دج", "3 شهر: 1900 دج", "1 سنة: 7000 دج"], details: "حساب خاص (Private) بكامل الصلاحيات، يدعم جهازين، مع ضمان كامل." },
                 { product: "Netflix Premium (4K HD)", offers: ["1 شهر: 400 دج", "3 شهر: 700 دج"], details: "حساب مشترك ببروفايل خاص محمي بكلمة سر للزبون." },
                 { product: "CapCut Pro", offers: ["1 شهر: 450 دج", "3 شهر: 700 دج", "6 شهر: 1000 دج", "1 سنة: 1500 دج"], details: "حساب مشترك بخصوصية تامة ومساحة عمل خاصة." },
-                { product: "ChatGPT Plus", offers: ["1 شهر: 700 دج"], details: "حساب ChatGPT Plus بميزات احترافية (الجملة لتجار الحسابات)." }
+                { product: "ChatGPT Plus", offers: ["1 شهر: 500 دج", "3 شهر: 1200 دج", "6 شهر: 2000 دج"], details: "حساب ChatGPT Plus بميزات احترافية (الجملة لتجار الحسابات)." }
             ],
             notes: "نظام المحفظة (Wallet) متوفر لشحن الرصيد والسحب الفوري للحسابات لتوفير الوقت."
         }
