@@ -29,6 +29,8 @@ let isBotStoppedGlobal = false; // متغير للتحكم في تشغيل ال�
 
 const AUTO_RESUME_DELAY = 24 * 60 * 60 * 1000; // 24 hours
 
+let sock; // جعل المتغير عاماً لسهولة الوصول إليه من معالجات تلغرام
+
 /**
 * دالة لتوليد معرف مميز للعمليات
 */
@@ -122,9 +124,10 @@ const handleAutoDelivery = async (productName, chatId, normalizedId, sock) => {
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
-    const sock = makeWASocket({
+    sock = makeWASocket({
         auth: state,
-        logger: pino({ level: 'silent' })
+        logger: pino({ level: 'silent' }),
+        browser: ["3Ahub Bot", "Safari", "1.0.0"] // إضافة متصفح لـ Pairing Code
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -154,11 +157,15 @@ async function startBot() {
         setTimeout(async () => {
             const phoneNumber = process.env.PAIRING_NUMBER;
             if (phoneNumber) {
-                console.log(`📱 Requesting Pairing Code for: ${phoneNumber}`);
-                const code = await sock.requestPairingCode(phoneNumber);
-                console.log(`\n==================================================`);
-                console.log(`🔢 YOUR PAIRING CODE:  ${code}`);
-                console.log(`==================================================\n`);
+                try {
+                    console.log(`📱 Requesting Pairing Code for: ${phoneNumber}`);
+                    const code = await sock.requestPairingCode(phoneNumber);
+                    console.log(`\n==================================================`);
+                    console.log(`🔢 YOUR PAIRING CODE:  ${code}`);
+                    console.log(`==================================================\n`);
+                } catch (err) {
+                    console.error("❌ Failed to request pairing code:", err.message);
+                }
             } else {
                 console.error("❌ ERROR: PAIRING_NUMBER is missing in .env file");
             }
@@ -166,151 +173,6 @@ async function startBot() {
     }
 
 
-    // بدء مراقبة تلغرام للتفاعلات (الأزرار)
-    startTelegramPolling(async ({ action, waChatId, data }) => {
-        if (action === 'resume') {
-            resumeChat(waChatId);
-        } else if (action === 'bizyes') {
-            const normalizedId = waChatId.replace(/\D/g, '');
-            console.log(`✅ Admin confirmed Business availability for ${normalizedId}. Generating smart reply...`);
-            try {
-                // جلب الذاكرة
-                let history = chatHistory.get(normalizedId) || [];
-                if (history.length === 0) {
-                    const dbHistory = await History.findOne({ chatId: normalizedId });
-                    if (dbHistory) history = dbHistory.messages;
-                }
-
-                const dataFetch = await fetchCurrentProducts();
-                const context = dataFetch ? formatProductsForAI(dataFetch) : "منتجاتنا متوفرة.";
-
-                // إعطاء تعليمات خاصة للذكاء الاصطناعي لصياغة الرد
-                const prompt = "الأدمن أكد أن حساب Business متوفر حالياً. رد على الزبون بأسلوبك الذكي والودود، أخبره بالخبر السعيد وذكره بعرض 'التجربة أولاً' (يفعله في إيميله قبل الدفع) لإقناعه وإتمام العملية.";
-
-                let aiResponse = await generateResponse(prompt, context, history);
-
-                let cleanResponse = aiResponse
-                    .replace(/REGISTER_ORDER/g, '')
-                    .replace(/CONTACT_ADMIN/g, '')
-                    .replace(/STOP_BOT/g, '')
-                    .replace(/BUSINESS_AVAILABILITY_QUERY/g, '')
-                    .trim();
-
-                const sentTrial = await sock.sendMessage(waChatId, { text: cleanResponse });
-                if (sentTrial && sentTrial.key) {
-                    botMessageIds.add(sentTrial.key.id);
-                }
-
-                // تحديث الذاكرة
-                history.push({ role: 'assistant', text: cleanResponse });
-                chatHistory.set(normalizedId, history);
-                await History.findOneAndUpdate({ chatId: normalizedId }, { messages: history, lastUpdate: new Date() }, { upsert: true });
-
-                // تفعيل البوت
-                resumeChat(waChatId);
-            } catch (err) {
-                console.error('❌ Error sending Smart Business confirmation:', err.message);
-            }
-        } else if (action === 'stop_bot') {
-            isBotStoppedGlobal = true;
-            sendNotification("🛑 <b>تم إيقاف البوت بالكامل!</b> لن يرد على أي رسالة حتى تقوم بتفعيله.");
-        } else if (action === 'start_bot') {
-            isBotStoppedGlobal = false;
-            sendNotification("🚀 <b>تم تفعيل البوت بالكامل!</b> عاد للعمل والرد على الجميع.");
-        } else if (action === 'restart_bot') {
-            await sendNotification("🔄 <b>جاري إعادة تشغيل البوت...</b> انتظر 10 ثواني.");
-            process.exit(1);
-        } else if (action === 'payment') {
-            console.log(`💰 Manual Payment Confirmation for ${waChatId}`);
-            const saleData = pendingSales.get(waChatId);
-            if (saleData) {
-                await saveSaleToSheet(saleData);
-                pendingSales.delete(waChatId);
-                console.log(`✅ Sale recorded in Sheets for ${waChatId}`);
-            }
-            await sendMetaEvent('Purchase', { phone: waChatId.split('@')[0] }, {
-                value: saleData?.price ? parseInt(saleData.price) : 1200,
-                currency: 'DZD',
-                contentName: saleData?.product || 'Service Order'
-            });
-            try {
-                const successMsg = "🎉 *تم تأكيد دفعك بنجاح!*\n\nشكراً لثقتك بنا. جاري الآن تفعيل اشتراكك وسنرسل لك البيانات في غضون لحظات. استعد للمتعة! 🚀";
-                const sentSuccess = await sock.sendMessage(waChatId, { text: successMsg });
-                if (sentSuccess && sentSuccess.key) {
-                    botMessageIds.add(sentSuccess.key.id);
-                }
-            } catch (err) {
-                console.error('❌ Error sending WhatsApp confirmation:', err.message);
-            }
-        } else if (action === 'payform') {
-            // callback_data: `payform_${phone}_${price}_${product}`
-            const parts = data.split('_');
-            const phone = parts[1];
-            const price = parts[2] || "1200";
-            const productName = parts[3] || "Form Order";
-
-            console.log(`🎯 Form Purchase confirmed via Telegram: ${phone} - ${productName} (${price} DA)`);
-
-            await sendMetaEvent('Purchase', { phone: phone }, {
-                value: parseInt(price),
-                currency: 'DZD',
-                contentName: productName
-            });
-        } else if (action === 'cancel') {
-            console.log(`❌ Order cancelled via Telegram for ${phone}`);
-        } else if (action === 'set_trw') {
-            const dataAction = waChatId; // في حالة الأوامر النصية، waChatId يحمل الرسالة
-            console.log(`🔐 Updating TRW Account from Telegram...`);
-            try {
-                const inventoryPath = './inventory.json';
-                let inventory = { "The Real World Account": [] };
-                if (fs.existsSync(inventoryPath)) {
-                    inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
-                }
-                // تحديث أول حساب موجود أو إضافة واحد جديد
-                if (inventory["The Real World Account"] && inventory["The Real World Account"].length > 0) {
-                    const currentAccount = inventory["The Real World Account"][0].account;
-                    let finalData = dataAction;
-
-                    // إذا كان المستخدم أرسل الباسوورد فقط (بدون :) وكان الحساب الحالي يحتوي على إيميل (فيه :)
-                    if (!dataAction.includes(':') && currentAccount.includes(':')) {
-                        const email = currentAccount.split(':')[0];
-                        finalData = `${email}:${dataAction}`;
-                    }
-
-                    inventory["The Real World Account"][0].account = finalData;
-                    inventory["The Real World Account"][0].status = "available";
-                    inventory["The Real World Account"][0].unlimited = true;
-
-                    fs.writeFileSync(inventoryPath, JSON.stringify(inventory, null, 2));
-                    await sendNotification(`✅ <b>تم تحديث حساب TRW بنجاح!</b>\n🎫 البيانات الجديدة: <code>${finalData}</code>`);
-                } else {
-                    inventory["The Real World Account"] = [{ account: dataAction, status: "available", unlimited: true }];
-                    fs.writeFileSync(inventoryPath, JSON.stringify(inventory, null, 2));
-                    await sendNotification(`✅ <b>تم إضافة حساب TRW جديد!</b>\n🎫 البيانات: <code>${dataAction}</code>`);
-                }
-            } catch (e) {
-                console.error('❌ Failed to update TRW account:', e.message);
-                await sendNotification(`❌ <b>فشل تحديث الحساب:</b> ${e.message}`);
-            }
-        } else if (action === 'show_inventory') {
-            try {
-                const inventoryPath = './inventory.json';
-                const inventory = fs.existsSync(inventoryPath) ? JSON.parse(fs.readFileSync(inventoryPath, 'utf8')) : {};
-                let invText = "📦 <b>المخزون الحالي:</b>\n\n";
-                for (const [prod, items] of Object.entries(inventory)) {
-                    invText += `<b>${prod}:</b>\n`;
-                    items.forEach((item, i) => {
-                        invText += `${i + 1}. ${item.account} (${item.status})${item.unlimited ? ' [♾️]' : ''}\n`;
-                    });
-                    invText += "\n";
-                }
-                await sendNotification(invText || "📂 المخزون فارغ حالياً.");
-            } catch (e) {
-                await sendNotification(`❌ خطأ في قراءة المخزون: ${e.message}`);
-            }
-        }
-    });
 
     sock.ev.on('messages.upsert', async (m) => {
         if (m.type !== 'notify') return; // تجاهل رسائل المزامنة التاريخية
@@ -875,5 +737,156 @@ async function startBot() {
         }
     });
 }
+
+// بدء مراقبة تلغرام للتفاعلات (الأزرار) مرة واحدة فقط عند تشغيل السيرفر
+startTelegramPolling(async ({ action, waChatId, data }) => {
+    if (action === 'resume') {
+        resumeChat(waChatId);
+    } else if (action === 'bizyes') {
+        const normalizedId = waChatId.replace(/\D/g, '');
+        console.log(`✅ Admin confirmed Business availability for ${normalizedId}. Generating smart reply...`);
+        try {
+            if (!sock) {
+                console.warn('⚠️ Cannot send reply: Bot is offline');
+                return;
+            }
+            // جلب الذاكرة
+            let history = chatHistory.get(normalizedId) || [];
+            if (history.length === 0) {
+                const dbHistory = await History.findOne({ chatId: normalizedId });
+                if (dbHistory) history = dbHistory.messages;
+            }
+
+            const dataFetch = await fetchCurrentProducts();
+            const context = dataFetch ? formatProductsForAI(dataFetch) : "منتجاتنا متوفرة.";
+
+            // إعطاء تعليمات خاصة للذكاء الاصطناعي لصياغة الرد
+            const prompt = "الأدمن أكد أن حساب Business متوفر حالياً. رد على الزبون بأسلوبك الذكي والودود، أخبره بالخبر السعيد وذكره بعرض 'التجربة أولاً' (يفعله في إيميله قبل الدفع) لإقناعه وإتمام العملية.";
+
+            let aiResponse = await generateResponse(prompt, context, history);
+
+            let cleanResponse = aiResponse
+                .replace(/REGISTER_ORDER/g, '')
+                .replace(/CONTACT_ADMIN/g, '')
+                .replace(/STOP_BOT/g, '')
+                .replace(/BUSINESS_AVAILABILITY_QUERY/g, '')
+                .trim();
+
+            const sentTrial = await sock.sendMessage(waChatId, { text: cleanResponse });
+            if (sentTrial && sentTrial.key) {
+                botMessageIds.add(sentTrial.key.id);
+            }
+
+            // تحديث الذاكرة
+            history.push({ role: 'assistant', text: cleanResponse });
+            chatHistory.set(normalizedId, history);
+            await History.findOneAndUpdate({ chatId: normalizedId }, { messages: history, lastUpdate: new Date() }, { upsert: true });
+
+            // تفعيل البوت
+            resumeChat(waChatId);
+        } catch (err) {
+            console.error('❌ Error sending Smart Business confirmation:', err.message);
+        }
+    } else if (action === 'stop_bot') {
+        isBotStoppedGlobal = true;
+        sendNotification("🛑 <b>تم إيقاف البوت بالكامل!</b> لن يرد على أي رسالة حتى تقوم بتفعيله.");
+    } else if (action === 'start_bot') {
+        isBotStoppedGlobal = false;
+        sendNotification("🚀 <b>تم تفعيل البوت بالكامل!</b> عاد للعمل والرد على الجميع.");
+    } else if (action === 'restart_bot') {
+        await sendNotification("🔄 <b>جاري إعادة تشغيل البوت...</b> انتظر 10 ثواني.");
+        process.exit(1);
+    } else if (action === 'payment') {
+        console.log(`💰 Manual Payment Confirmation for ${waChatId}`);
+        const saleData = pendingSales.get(waChatId);
+        if (saleData) {
+            await saveSaleToSheet(saleData);
+            pendingSales.delete(waChatId);
+            console.log(`✅ Sale recorded in Sheets for ${waChatId}`);
+        }
+        await sendMetaEvent('Purchase', { phone: waChatId.split('@')[0] }, {
+            value: saleData?.price ? parseInt(saleData.price) : 1200,
+            currency: 'DZD',
+            contentName: saleData?.product || 'Service Order'
+        });
+        try {
+            if (!sock) throw new Error('Bot offline');
+            const successMsg = "🎉 *تم تأكيد دفعك بنجاح!*\n\nشكراً لثقتك بنا. جاري الآن تفعيل اشتراكك وسنرسل لك البيانات في غضون لحظات. استعد للمتعة! 🚀";
+            const sentSuccess = await sock.sendMessage(waChatId, { text: successMsg });
+            if (sentSuccess && sentSuccess.key) {
+                botMessageIds.add(sentSuccess.key.id);
+            }
+        } catch (err) {
+            console.error('❌ Error sending WhatsApp confirmation:', err.message);
+        }
+    } else if (action === 'payform') {
+        // callback_data: `payform_${phone}_${price}_${product}`
+        const parts = data.split('_');
+        const phone = parts[1];
+        const price = parts[2] || "1200";
+        const productName = parts[3] || "Form Order";
+
+        console.log(`🎯 Form Purchase confirmed via Telegram: ${phone} - ${productName} (${price} DA)`);
+
+        await sendMetaEvent('Purchase', { phone: phone }, {
+            value: parseInt(price),
+            currency: 'DZD',
+            contentName: productName
+        });
+    } else if (action === 'cancel') {
+        console.log(`❌ Order cancelled via Telegram`);
+    } else if (action === 'set_trw') {
+        const dataAction = waChatId; // في حالة الأوامر النصية، waChatId يحمل الرسالة
+        console.log(`🔐 Updating TRW Account from Telegram...`);
+        try {
+            const inventoryPath = './inventory.json';
+            let inventory = { "The Real World Account": [] };
+            if (fs.existsSync(inventoryPath)) {
+                inventory = JSON.parse(fs.readFileSync(inventoryPath, 'utf8'));
+            }
+            // تحديث أول حساب موجود أو إضافة واحد جديد
+            if (inventory["The Real World Account"] && inventory["The Real World Account"].length > 0) {
+                const currentAccount = inventory["The Real World Account"][0].account;
+                let finalData = dataAction;
+
+                // إذا كان المستخدم أرسل الباسوورد فقط (بدون :) وكان الحساب الحالي يحتوي على إيميل (فيه :)
+                if (!dataAction.includes(':') && currentAccount.includes(':')) {
+                    const email = currentAccount.split(':')[0];
+                    finalData = `${email}:${dataAction}`;
+                }
+
+                inventory["The Real World Account"][0].account = finalData;
+                inventory["The Real World Account"][0].status = "available";
+                inventory["The Real World Account"][0].unlimited = true;
+
+                fs.writeFileSync(inventoryPath, JSON.stringify(inventory, null, 2));
+                await sendNotification(`✅ <b>تم تحديث حساب TRW بنجاح!</b>\n🎫 البيانات الجديدة: <code>${finalData}</code>`);
+            } else {
+                inventory["The Real World Account"] = [{ account: dataAction, status: "available", unlimited: true }];
+                fs.writeFileSync(inventoryPath, JSON.stringify(inventory, null, 2));
+                await sendNotification(`✅ <b>تم إضافة حساب TRW جديد!</b>\n🎫 البيانات: <code>${dataAction}</code>`);
+            }
+        } catch (e) {
+            console.error('❌ Failed to update TRW account:', e.message);
+            await sendNotification(`❌ <b>فشل تحديث الحساب:</b> ${e.message}`);
+        }
+    } else if (action === 'show_inventory') {
+        try {
+            const inventoryPath = './inventory.json';
+            const inventory = fs.existsSync(inventoryPath) ? JSON.parse(fs.readFileSync(inventoryPath, 'utf8')) : {};
+            let invText = "📦 <b>المخزون الحالي:</b>\n\n";
+            for (const [prod, items] of Object.entries(inventory)) {
+                invText += `<b>${prod}:</b>\n`;
+                items.forEach((item, i) => {
+                    invText += `${i + 1}. ${item.account} (${item.status})${item.unlimited ? ' [♾️]' : ''}\n`;
+                });
+                invText += "\n";
+            }
+            await sendNotification(invText || "📂 المخزون فارغ حالياً.");
+        } catch (e) {
+            await sendNotification(`❌ خطأ في قراءة المخزون: ${e.message}`);
+        }
+    }
+});
 
 startBot();
