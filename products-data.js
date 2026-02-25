@@ -77,11 +77,12 @@ export const PRODUCTS_DATA = {
             category: "AI Search & Research",
             keywords: ["search engine", "research", "citations", "academic"],
             delivery_type: "email_password",
-            price_dzd: 1200,
-            price_usd: 4.5,
-            description: "حساب Perplexity AI Pro للبحث الذكي والتحليل الأكاديمي. (حالياً غير متوفر - Sold Out)",
-            available: false,
-            durations: []
+            price_dzd: 800,
+            price_usd: 3,
+            description: "حساب Perplexity AI Pro للبحث الذكي والتحليل الأكاديمي. اشتراك لمدة شهر واحد.",
+            durations: [
+                { key: "1month", price_dzd: 800, price_usd: 3, description: "Perplexity Pro - 1 Month (800 DA)" }
+            ]
         },
         {
             name: "Canva Pro",
@@ -119,6 +120,30 @@ export const PRODUCTS_DATA = {
                     { duration: "1 Year", wholesale_dzd: 1500, wholesale_usd: 6.0, suggested_retail_dzd: 3500 }
                 ]
             }
+        },
+        {
+            name: "Duolingo Family Super",
+            category: "Education",
+            keywords: ["duolingo", "language", "learn", "super", "family"],
+            delivery_type: "email_invite",
+            price_dzd: 2800,
+            price_usd: 10,
+            description: "اشتراك Duolingo Super Family لمدة سنة كاملة. حساب خاص بك مع قلوب غير محدودة وبدون إعلانات.",
+            durations: [
+                { key: "1year", price_dzd: 2800, price_usd: 10, description: "اشتراك سنة كاملة (Family Plan Slot)" }
+            ]
+        },
+        {
+            name: "YouTube Premium",
+            category: "Streaming & Movies",
+            keywords: ["youtube", "ad-free", "background play", "music", "video"],
+            delivery_type: "email_invite",
+            price_dzd: 500,
+            price_usd: 2,
+            description: "اشتراك YouTube Premium خاص لمدة شهر واحد. استمتع بمشاهدة بدون إعلانات مع تشغيل في الخلفية و YouTube Music.",
+            durations: [
+                { key: "1month", price_dzd: 500, price_usd: 2, description: "حساب خاص (Private) لمدة شهر - بدون إعلانات + YouTube Music" }
+            ]
         },
         {
             name: "Netflix Premium",
