@@ -64,7 +64,7 @@ async function sendMetaEvent(eventName, userData, eventData) {
             payload.test_event_code = process.env.FB_TEST_EVENT_CODE;
         }
 
-        const response = await axios.post(url, payload);
+        const response = await axios.post(url, payload, { timeout: 30000 }); // زيادة المهلة لـ 30 ثانية
 
         console.log(`✅ Meta CAPI: Event '${eventName}' sent successfully.`, response.data);
         return true;

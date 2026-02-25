@@ -73,8 +73,8 @@ async function startTelegramPolling(onAction) {
                     const waChatId = data.split('_')[1];
                     const action = data.split('_')[0];
 
-                    // تنفيذ الأكشن (resume أو payment أو bizyes أو sheet أو payform)
-                    onAction({ action, waChatId, data });
+                    // تنفيذ الأكشن والانتظار لمعرفة النتيجة
+                    const result = await onAction({ action, waChatId, data });
 
                     // تأكيد النقر في تلغرام
                     let responseText = "";
@@ -84,17 +84,16 @@ async function startTelegramPolling(onAction) {
                         responseText = "✅ تم إعادة تفعيل البوت!";
                         statusText = "✅ تم التفعيل بنجاح";
                     } else if (action === 'payment' || action === 'payform') {
-                        responseText = "✅ تم إرسال حدث الشراء لفيسبوك!";
-                        statusText = "💰 تم تأكيد الدفع وإرسال CAPI";
+                        if (result !== false) {
+                            responseText = "✅ تم إرسال حدث الشراء لفيسبوك!";
+                            statusText = "💰 تم تأكيد الدفع وإرسال CAPI";
+                        } else {
+                            responseText = "❌ فشل الإرسال لفيسبوك (مشكلة اتصال)";
+                            statusText = "⚠️ خطأ في إرسال CAPI (تأكد من الإنترنت)";
+                        }
                     } else if (action === 'bizyes') {
                         responseText = "✅ تم تأكيد توفر الحساب وإرسال العرض!";
-                        statusText = "⚡ تم إخطار الزبون بتوفر الحساب (عرض التجربة)";
-                    } else if (action === 'sheet') {
-                        responseText = "📊 تم تسجيل البيعة في Google Sheets!";
-                        statusText = "📊 تم الحفظ في Google Sheets بنجاح";
-                    } else if (action === 'cancel') {
-                        responseText = "❌ تم إلغاء الطلب";
-                        statusText = "❌ تم الإلغاء";
+                        statusText = "⚡ تم إخطار الزبون بتوفر الحساب";
                     }
 
                     await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
@@ -102,7 +101,7 @@ async function startTelegramPolling(onAction) {
                         text: responseText
                     });
 
-                    // تحديث الرسالة لتوضيح أنها اكتملت
+                    // تحديث الرسالة بالنتيجة الحقيقية
                     const displayId = waChatId ? waChatId.split('@')[0] : '—';
                     await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
                         chat_id: TELEGRAM_CHAT_ID,
