@@ -1,17 +1,19 @@
 import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import pino from 'pino';
-import QRCode from 'qrcode';
 import fs from 'fs';
 import qrcodeTerminal from 'qrcode-terminal';
 import { generateResponse } from './ai-handler.js';
 import { fetchCurrentProducts, formatProductsForAI } from './products-fetcher.js';
 import { sendNotification, sendNotificationWithButton, startTelegramPolling } from './telegram-notify.js';
 import { sendMetaEvent } from './meta-capi.js';
-import { downloadMediaMessage } from '@whiskeysockets/baileys';
 import mongoose from 'mongoose';
 import History from './History.js';
 import { saveSaleToSheet } from './sheets-logger.js';
+
+// Connection Lock to prevent loops
+let isStarting = false;
+let sock;
 
 // 🗄️ Database Connection
 mongoose.connect(process.env.MONGODB_URI)
@@ -20,33 +22,30 @@ mongoose.connect(process.env.MONGODB_URI)
 
 const chatHistory = new Map();
 const pausedChats = new Set();
-const botMessageIds = new Set();
-const autoResumeTimers = new Map();
 const contactNames = new Map();
 const pendingSales = new Map();
 let isBotStoppedGlobal = false;
-
-let sock;
 
 function resumeChat(chatId) {
     const digits = chatId.replace(/\D/g, '');
     pausedChats.delete(chatId);
     pausedChats.delete(digits);
-    if (autoResumeTimers.has(digits)) {
-        clearTimeout(autoResumeTimers.get(digits));
-        autoResumeTimers.delete(digits);
-    }
     console.log(`✅ AI Resumed for ${chatId}`);
 }
 
 async function startBot() {
+    if (isStarting) return;
+    isStarting = true;
+
+    console.log('🚀 Finalizing Bot Start Sequence...');
+
     const { state, saveCreds } = await useMultiFileAuthState('auth_info');
 
-    // 🔄 Returning to the OLD stable browser settings
     sock = makeWASocket({
         auth: state,
         logger: pino({ level: 'silent' }),
-        browser: ["3Ahub Bot", "Chrome", "1.0.0"]
+        browser: ["3Ahub Bot", "Chrome", "1.0.0"],
+        printQRInTerminal: false
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -59,15 +58,30 @@ async function startBot() {
         }
 
         if (connection === 'close') {
-            const shouldReconnect = (lastDisconnect?.error instanceof Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('🔌 Connection closed. Reconnecting:', shouldReconnect);
-            if (shouldReconnect) startBot();
+            isStarting = false;
+            const statusCode = (lastDisconnect?.error instanceof Boom)?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+            console.log('🔌 Connection closed. Reason:', lastDisconnect?.error?.message || statusCode);
+
+            if (shouldReconnect) {
+                console.log('🔄 Reconnecting in 10 seconds...');
+                setTimeout(() => startBot(), 10000);
+            } else {
+                console.log('❌ Logged out. Manual intervention required (Clear auth_info).');
+                // Auto-clean on logout to allow fresh pairing
+                fs.rmSync('./auth_info', { recursive: true, force: true });
+                setTimeout(() => startBot(), 5000);
+            }
         } else if (connection === 'open') {
-            console.log('✅ BOT IS ONLINE AND READY!');
+            isStarting = false;
+            console.log('\n==================================================');
+            console.log('✅ BOT IS ONLINE AND READY TO RESPOND!');
+            console.log('==================================================\n');
         }
     });
 
-    // 🔹 Pairing Code (The way it was working)
+    // 🔹 Pairing Code Logic (Restored to working state)
     if (!state.creds.registered && process.env.USE_PAIRING_CODE === 'true') {
         const phoneNumber = process.env.PAIRING_NUMBER;
         if (phoneNumber) {
@@ -79,9 +93,9 @@ async function startBot() {
                     console.log(`🔢 YOUR PAIRING CODE:  ${code}`);
                     console.log(`==================================================\n`);
                 } catch (err) {
-                    console.error("❌ Pairing Error:", err.message);
+                    console.error("❌ Pairing Request Failed:", err.message);
                 }
-            }, 5000);
+            }, 8000); // 8 seconds delay to ensure socket is ready
         }
     }
 
@@ -92,12 +106,21 @@ async function startBot() {
 
         const chatId = msg.key.remoteJid;
         const normalizedId = chatId.replace(/\D/g, '');
-        const text = msg.message.conversation || msg.message.extendedTextMessage?.text || msg.message.imageMessage?.caption || '';
+
+        const getMessageText = (m) => {
+            const message = m.message;
+            if (!message) return '';
+            const content = message.ephemeralMessage?.message || message.viewOnceMessage?.message || message.viewOnceMessageV2?.message || message;
+            return content.conversation || content.extendedTextMessage?.text || content.imageMessage?.caption || '';
+        };
+
+        const text = getMessageText(msg);
+        const messageText = text.trim().toLowerCase();
 
         if (chatId.includes('@g.us')) return;
 
         if (msg.key.fromMe) {
-            if (text.toLowerCase() === '!ok') resumeChat(normalizedId);
+            if (messageText === '!ok') resumeChat(normalizedId);
             return;
         }
 
@@ -111,7 +134,7 @@ async function startBot() {
     });
 }
 
-// 📡 Telegram Polling (Simplified to avoid loops)
+// 📡 Telegram Polling
 startTelegramPolling(async ({ action, waChatId, data }) => {
     if (action === 'resume') resumeChat(waChatId);
     else if (action === 'stop_bot') isBotStoppedGlobal = true;
@@ -119,7 +142,11 @@ startTelegramPolling(async ({ action, waChatId, data }) => {
     else if (action === 'payment' || action === 'payform') {
         const phone = action === 'payform' ? data.split('_')[1] : waChatId.split('@')[0];
         await sendMetaEvent('Purchase', { phone: phone }, { value: 1200, currency: 'DZD', contentName: 'Confirmed Order' });
-        if (sock && waChatId) await sock.sendMessage(waChatId, { text: "🎉 تم تأكيد دفعك بنجاح!" });
+        if (sock && waChatId) {
+            try {
+                await sock.sendMessage(waChatId, { text: "🎉 تم تأكيد دفعك بنجاح!" });
+            } catch (e) { }
+        }
     }
 });
 
