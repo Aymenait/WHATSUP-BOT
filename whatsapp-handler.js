@@ -165,8 +165,9 @@ async function startBot() {
         }, 5000);
     }
 
+
     // بدء مراقبة تلغرام للتفاعلات (الأزرار)
-    startTelegramPolling(async ({ action, waChatId }) => {
+    startTelegramPolling(async ({ action, waChatId, data }) => {
         if (action === 'resume') {
             resumeChat(waChatId);
         } else if (action === 'bizyes') {
@@ -180,8 +181,8 @@ async function startBot() {
                     if (dbHistory) history = dbHistory.messages;
                 }
 
-                const data = await fetchCurrentProducts();
-                const context = data ? formatProductsForAI(data) : "منتجاتنا متوفرة.";
+                const dataFetch = await fetchCurrentProducts();
+                const context = dataFetch ? formatProductsForAI(dataFetch) : "منتجاتنا متوفرة.";
 
                 // إعطاء تعليمات خاصة للذكاء الاصطناعي لصياغة الرد
                 const prompt = "الأدمن أكد أن حساب Business متوفر حالياً. رد على الزبون بأسلوبك الذكي والودود، أخبره بالخبر السعيد وذكره بعرض 'التجربة أولاً' (يفعله في إيميله قبل الدفع) لإقناعه وإتمام العملية.";
@@ -241,8 +242,24 @@ async function startBot() {
             } catch (err) {
                 console.error('❌ Error sending WhatsApp confirmation:', err.message);
             }
+        } else if (action === 'payform') {
+            // callback_data: `payform_${phone}_${price}_${product}`
+            const parts = data.split('_');
+            const phone = parts[1];
+            const price = parts[2] || "1200";
+            const productName = parts[3] || "Form Order";
+
+            console.log(`🎯 Form Purchase confirmed via Telegram: ${phone} - ${productName} (${price} DA)`);
+
+            await sendMetaEvent('Purchase', { phone: phone }, {
+                value: parseInt(price),
+                currency: 'DZD',
+                contentName: productName
+            });
+        } else if (action === 'cancel') {
+            console.log(`❌ Order cancelled via Telegram for ${phone}`);
         } else if (action === 'set_trw') {
-            const data = waChatId; // في حالة الأوامر النصية، waChatId يحمل الرسالة
+            const dataAction = waChatId; // في حالة الأوامر النصية، waChatId يحمل الرسالة
             console.log(`🔐 Updating TRW Account from Telegram...`);
             try {
                 const inventoryPath = './inventory.json';
@@ -253,12 +270,12 @@ async function startBot() {
                 // تحديث أول حساب موجود أو إضافة واحد جديد
                 if (inventory["The Real World Account"] && inventory["The Real World Account"].length > 0) {
                     const currentAccount = inventory["The Real World Account"][0].account;
-                    let finalData = data;
+                    let finalData = dataAction;
 
                     // إذا كان المستخدم أرسل الباسوورد فقط (بدون :) وكان الحساب الحالي يحتوي على إيميل (فيه :)
-                    if (!data.includes(':') && currentAccount.includes(':')) {
+                    if (!dataAction.includes(':') && currentAccount.includes(':')) {
                         const email = currentAccount.split(':')[0];
-                        finalData = `${email}:${data}`;
+                        finalData = `${email}:${dataAction}`;
                     }
 
                     inventory["The Real World Account"][0].account = finalData;
@@ -268,9 +285,9 @@ async function startBot() {
                     fs.writeFileSync(inventoryPath, JSON.stringify(inventory, null, 2));
                     await sendNotification(`✅ <b>تم تحديث حساب TRW بنجاح!</b>\n🎫 البيانات الجديدة: <code>${finalData}</code>`);
                 } else {
-                    inventory["The Real World Account"] = [{ account: data, status: "available", unlimited: true }];
+                    inventory["The Real World Account"] = [{ account: dataAction, status: "available", unlimited: true }];
                     fs.writeFileSync(inventoryPath, JSON.stringify(inventory, null, 2));
-                    await sendNotification(`✅ <b>تم إضافة حساب TRW جديد!</b>\n🎫 البيانات: <code>${data}</code>`);
+                    await sendNotification(`✅ <b>تم إضافة حساب TRW جديد!</b>\n🎫 البيانات: <code>${dataAction}</code>`);
                 }
             } catch (e) {
                 console.error('❌ Failed to update TRW account:', e.message);

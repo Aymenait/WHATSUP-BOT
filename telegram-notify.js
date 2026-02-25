@@ -73,8 +73,8 @@ async function startTelegramPolling(onAction) {
                     const waChatId = data.split('_')[1];
                     const action = data.split('_')[0];
 
-                    // تنفيذ الأكشن (resume أو payment أو bizyes أو sheet)
-                    onAction({ action, waChatId });
+                    // تنفيذ الأكشن (resume أو payment أو bizyes أو sheet أو payform)
+                    onAction({ action, waChatId, data });
 
                     // تأكيد النقر في تلغرام
                     let responseText = "";
@@ -83,7 +83,7 @@ async function startTelegramPolling(onAction) {
                     if (action === 'resume') {
                         responseText = "✅ تم إعادة تفعيل البوت!";
                         statusText = "✅ تم التفعيل بنجاح";
-                    } else if (action === 'payment') {
+                    } else if (action === 'payment' || action === 'payform') {
                         responseText = "✅ تم إرسال حدث الشراء لفيسبوك!";
                         statusText = "💰 تم تأكيد الدفع وإرسال CAPI";
                     } else if (action === 'bizyes') {
@@ -92,6 +92,9 @@ async function startTelegramPolling(onAction) {
                     } else if (action === 'sheet') {
                         responseText = "📊 تم تسجيل البيعة في Google Sheets!";
                         statusText = "📊 تم الحفظ في Google Sheets بنجاح";
+                    } else if (action === 'cancel') {
+                        responseText = "❌ تم إلغاء الطلب";
+                        statusText = "❌ تم الإلغاء";
                     }
 
                     await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
@@ -100,14 +103,16 @@ async function startTelegramPolling(onAction) {
                     });
 
                     // تحديث الرسالة لتوضيح أنها اكتملت
+                    const displayId = waChatId ? waChatId.split('@')[0] : '—';
                     await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/editMessageText`, {
                         chat_id: TELEGRAM_CHAT_ID,
                         message_id: update.callback_query.message.message_id,
-                        text: update.callback_query.message.text + `\n\n${statusText}\n📱 ${waChatId.split('@')[0]}`,
+                        text: update.callback_query.message.text + `\n\n${statusText}\n📱 ${displayId}`,
                         parse_mode: 'HTML'
                     });
                 } else if (update.message && update.message.chat.id.toString() === TELEGRAM_CHAT_ID.toString()) {
                     const text = update.message.text;
+                    if (!text) return;
 
                     if (text === '/stop') {
                         onAction({ action: 'stop_bot' });
@@ -128,7 +133,7 @@ async function startTelegramPolling(onAction) {
                         sendNotification(helpMsg);
                     } else if (text.startsWith('/set_trw ')) {
                         const accountData = text.replace('/set_trw ', '').trim();
-                        onAction({ action: 'set_trw', waChatId: accountData }); // waChatId is reused here for the raw data
+                        onAction({ action: 'set_trw', waChatId: accountData });
                     } else if (text === '/inventory') {
                         onAction({ action: 'show_inventory' });
                     } else if (text === '/ping') {
