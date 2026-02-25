@@ -126,8 +126,7 @@ async function startBot() {
 
     sock = makeWASocket({
         auth: state,
-        logger: pino({ level: 'silent' }),
-        browser: ["Ubuntu", "Chrome", "20.0.04"]
+        logger: pino({ level: 'silent' })
     });
 
     sock.ev.on('creds.update', saveCreds);
