@@ -1,10 +1,61 @@
-import { PRODUCTS_DATA } from './products-data.js';
+import { db, collection, getDocs, query, where, orderBy } from './firebase-config.js';
 
 /**
- * جلب قائمة المنتجات المحدثة (من الملف المحلي مباشرة)
+ * جلب قائمة المنتجات المحدثة من Firebase Firestore
  */
 async function fetchCurrentProducts() {
-    return PRODUCTS_DATA;
+    try {
+        console.log('🔥 Fetching products from Firebase...');
+
+        // Query active products from Firestore (same collection as website)
+        const q = query(
+            collection(db, 'products_v2'),
+            where('isArchived', '==', false)
+        );
+
+        const querySnapshot = await getDocs(q);
+        const products = [];
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            products.push({
+                id: doc.id,
+                name: data.name?.ar || data.name || 'منتج',
+                category: data.category || 'عام',
+                keywords: data.keywords || [],
+                description: data.description?.ar || data.description || '',
+                price_dzd: data.priceDZD || 0,
+                price_usd: data.priceUSD || 0,
+                durations: data.durations || [],
+                availability: data.availability || 'available',
+                delivery_type: data.deliveryType || 'email_password'
+            });
+        });
+
+        console.log(`✅ Loaded ${products.length} products from Firebase`);
+
+        // Return in same format as before
+        return {
+            products: products,
+            payment_methods: [
+                { id: "baridimob", name: "BaridiMob", rip: process.env.BARIDIMOB_RIP || "00799999002787548473" },
+                { id: "usdt", name: "USDT", networks: {
+                    trc20: process.env.USDT_TRC20 || "TWTgY41LNFqZcgBiRCZYsSq6ooeCx8gus9",
+                    bep20: process.env.USDT_BEP20 || "0xa07c3892bd946f61ec736f52dd8ecacb8c2edec0"
+                }},
+                { id: "redotpay", name: "RedotPay", id_number: process.env.REDOTPAY_ID || "1117632168" },
+                { id: "binance", name: "Binance Pay", pay_id: process.env.BINANCE_PAY_ID || "527899700" }
+            ]
+        };
+
+    } catch (error) {
+        console.error('❌ Firebase Error:', error.message);
+        console.log('⚠️ Falling back to local products data...');
+
+        // Fallback to local data if Firebase fails
+        const { PRODUCTS_DATA } = await import('./products-data.js');
+        return PRODUCTS_DATA;
+    }
 }
 
 /**
